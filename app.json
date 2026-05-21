@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "KafuDeal",
+    "slug": "kafudeal",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "kafudeal",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "cover",
+      "backgroundColor": "#FF6B2C"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.kafudeal.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#FF6B2C"
+      },
+      "package": "com.kafudeal.app"
+    },
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/icon.png"
+    },
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": false
+    },
+    "extra": {
+      "eas": {
+        "projectId": "36d4b269-b76f-44dd-aaf8-af57815c09a7"
+      },
+      "router": {
+        "origin": false
+      }
+    },
+    "owner": "kafudeals-organization"
+  }
+}
