@@ -1,57 +1,63 @@
-import { useEffect } from "react";
-import { View, Text, Pressable, ActivityIndicator } from "react-native";
+import { useEffect, useRef } from "react";
+import { View, Text, Pressable, ActivityIndicator, Animated, Easing } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  withRepeat,
-  withSequence,
-  Easing,
-} from "react-native-reanimated";
 import KafuMark from "../components/KafuMark";
 
 export default function Splash() {
-  const logoScale = useSharedValue(0.55);
-  const logoOpacity = useSharedValue(0);
-  const float = useSharedValue(0);
-  const haloRotate = useSharedValue(0);
+  const logoScale = useRef(new Animated.Value(0.55)).current;
+  const logoOpacity = useRef(new Animated.Value(0)).current;
+  const float = useRef(new Animated.Value(0)).current;
+  const haloRotate = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    logoOpacity.value = withTiming(1, { duration: 400 });
-    logoScale.value = withTiming(1, {
+    Animated.timing(logoOpacity, {
+      toValue: 1,
+      duration: 400,
+      useNativeDriver: true,
+    }).start();
+
+    Animated.timing(logoScale, {
+      toValue: 1,
       duration: 900,
       easing: Easing.bezier(0.22, 1, 0.36, 1),
-    });
-    // gentle float
-    float.value = withRepeat(
-      withSequence(
-        withTiming(-6, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0, { duration: 2000, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1,
-      false
-    );
-    // halo spin
-    haloRotate.value = withRepeat(
-      withTiming(360, { duration: 14000, easing: Easing.linear }),
-      -1,
-      false
-    );
+      useNativeDriver: true,
+    }).start();
+
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(float, {
+          toValue: -6,
+          duration: 2000,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(float, {
+          toValue: 0,
+          duration: 2000,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+
+    Animated.loop(
+      Animated.timing(haloRotate, {
+        toValue: 1,
+        duration: 14000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    ).start();
 
     const t = setTimeout(() => router.replace("/(tabs)"), 2400);
     return () => clearTimeout(t);
   }, []);
 
-  const logoStyle = useAnimatedStyle(() => ({
-    opacity: logoOpacity.value,
-    transform: [{ scale: logoScale.value }, { translateY: float.value }],
-  }));
-
-  const haloStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${haloRotate.value}deg` }],
-  }));
+  const rotate = haloRotate.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "360deg"],
+  });
 
   return (
     <LinearGradient
@@ -60,28 +66,24 @@ export default function Splash() {
       end={{ x: 0.3, y: 1 }}
       style={{ flex: 1 }}
     >
-      {/* Spinning halo behind the logo */}
       <Animated.View
         pointerEvents="none"
-        style={[
-          {
-            position: "absolute",
-            top: "50%",
-            left: "50%",
-            width: 300,
-            height: 300,
-            marginLeft: -150,
-            marginTop: -150,
-            borderRadius: 150,
-            borderWidth: 24,
-            borderColor: "rgba(255,255,255,0.15)",
-            opacity: 0.6,
-          },
-          haloStyle,
-        ]}
+        style={{
+          position: "absolute",
+          top: "50%",
+          left: "50%",
+          width: 300,
+          height: 300,
+          marginLeft: -150,
+          marginTop: -150,
+          borderRadius: 150,
+          borderWidth: 24,
+          borderColor: "rgba(255,255,255,0.15)",
+          opacity: 0.6,
+          transform: [{ rotate }],
+        }}
       />
 
-      {/* Skip */}
       <Pressable
         onPress={() => router.replace("/(tabs)")}
         style={{
@@ -96,21 +98,21 @@ export default function Splash() {
           borderColor: "rgba(255,255,255,0.35)",
         }}
       >
-        <Text className="text-white font-bold text-xs">Skip →</Text>
+        <Text style={{ color: "white", fontWeight: "700", fontSize: 12 }}>Skip →</Text>
       </Pressable>
 
-      <View className="flex-1 items-center justify-center px-8">
-        <Animated.View style={logoStyle}>
-          <View
-            style={{
-              shadowColor: "#000",
-              shadowOpacity: 0.25,
-              shadowOffset: { width: 0, height: 18 },
-              shadowRadius: 40,
-            }}
-          >
-            <KafuMark size={160} variant="white" />
-          </View>
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 }}>
+        <Animated.View
+          style={{
+            opacity: logoOpacity,
+            transform: [{ scale: logoScale }, { translateY: float }],
+            shadowColor: "#000",
+            shadowOpacity: 0.25,
+            shadowOffset: { width: 0, height: 18 },
+            shadowRadius: 40,
+          }}
+        >
+          <KafuMark size={160} variant="white" />
         </Animated.View>
 
         <Text
@@ -140,7 +142,6 @@ export default function Splash() {
 
         <ActivityIndicator color="white" style={{ marginTop: 40 }} />
 
-        {/* Trust strip */}
         <View
           style={{
             position: "absolute",
