@@ -1,19 +1,61 @@
-import { View, Text, ScrollView, Pressable, Image, StyleSheet } from "react-native";
+import { useEffect, useState, useRef } from "react";
+import { View, Text, ScrollView, Pressable, Image, StyleSheet, Animated } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
-import { products, categories } from "../../data/products";
+import {
+  products, categories,
+  endingSoon, topDeals, freshAndBakery, beautyDeals,
+} from "../../data/products";
 import { useCart } from "../../lib/cart-context";
+import ProductCard from "../../components/ProductCard";
+
+const PHRASES = [
+  "Try 'chocolate'",
+  "Try 'sourdough'",
+  "Try 'milk 2L'",
+  "Try 'iftar deals'",
+  "Try 'strawberries'",
+];
 
 export default function Home() {
   const insets = useSafeAreaInsets();
-  const { add } = useCart();
+  const { count } = useCart();
+  const [placeholder, setPlaceholder] = useState("");
+
+  // Typewriter loop in the search bar
+  useEffect(() => {
+    let pi = 0, ci = 0, deleting = false;
+    let timer: any;
+    const tick = () => {
+      const word = PHRASES[pi];
+      if (!deleting) {
+        ci++;
+        setPlaceholder(word.slice(0, ci));
+        if (ci === word.length) {
+          deleting = true;
+          timer = setTimeout(tick, 1600);
+          return;
+        }
+      } else {
+        ci--;
+        setPlaceholder(word.slice(0, ci));
+        if (ci === 0) {
+          deleting = false;
+          pi = (pi + 1) % PHRASES.length;
+        }
+      }
+      timer = setTimeout(tick, deleting ? 35 : 75);
+    };
+    tick();
+    return () => clearTimeout(timer);
+  }, []);
 
   return (
     <ScrollView
       style={s.scroll}
-      contentContainerStyle={{ paddingBottom: 24 }}
+      contentContainerStyle={{ paddingBottom: 30 }}
       showsVerticalScrollIndicator={false}
     >
       {/* Orange Banner */}
@@ -44,10 +86,13 @@ export default function Home() {
           </View>
         </View>
 
-        {/* Search bar */}
+        {/* Search bar with typewriter placeholder */}
         <Pressable onPress={() => router.push("/search")} style={s.search}>
           <Ionicons name="search" size={20} color="#334155" />
-          <Text style={s.searchPlaceholder}>Search snacks, brands, stores…</Text>
+          <Text style={s.searchPlaceholder}>
+            {placeholder}
+            <Text style={s.cursor}>|</Text>
+          </Text>
         </Pressable>
 
         {/* Trust strip */}
@@ -65,7 +110,7 @@ export default function Home() {
         </View>
       </LinearGradient>
 
-      {/* Categories */}
+      {/* Category chips */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -91,7 +136,7 @@ export default function Home() {
         ))}
       </ScrollView>
 
-      {/* Sign-in card */}
+      {/* Sign-in pill */}
       <Pressable
         onPress={() => router.push("/login")}
         style={s.signinCard}
@@ -108,60 +153,79 @@ export default function Home() {
         </View>
       </Pressable>
 
-      {/* Top deals header */}
-      <View style={s.sectionHead}>
-        <Text style={s.sectionTitle}>Top deals near you 🔥</Text>
-        <Pressable onPress={() => router.push("/(tabs)/deals")}>
-          <Text style={s.seeAll}>See all →</Text>
-        </Pressable>
+      {/* Section: Ending soon */}
+      <Section
+        title="Ending soon 🔥"
+        sub="Grab these before they're gone"
+        onSeeAll={() => router.push("/(tabs)/deals")}
+      />
+      <HScroll items={endingSoon} />
+
+      {/* Section: Top deals */}
+      <Section
+        title="Top deals near you"
+        sub="Biggest discounts today"
+        onSeeAll={() => router.push("/(tabs)/deals")}
+      />
+      <HScroll items={topDeals} />
+
+      {/* Banner */}
+      <View style={s.proBanner}>
+        <View style={{ flex: 1 }}>
+          <Text style={s.proBannerTitle}>KafuDeal Pro</Text>
+          <Text style={s.proBannerSub}>Free delivery + early access to drops</Text>
+          <Text style={s.proBannerCta}>Try free for 30 days →</Text>
+        </View>
+        <View style={s.proBannerIcon}>
+          <Ionicons name="star" size={24} color="white" />
+        </View>
       </View>
 
-      {/* Product grid */}
-      <View style={s.grid}>
-        {products.map((p) => (
-          <Pressable
-            key={p.id}
-            onPress={() => router.push(`/product/${p.id}`)}
-            style={s.card}
-          >
-            <View style={s.cardImg}>
-              <Image source={{ uri: p.image }} style={{ width: "100%", height: "100%" }} />
-              <View style={s.discBadge}>
-                <Text style={s.discText}>-{p.discount}%</Text>
-              </View>
-              <Pressable style={s.favBadge}>
-                <Ionicons name="heart-outline" size={16} color="#0F172A" />
-              </Pressable>
-            </View>
-            <View style={{ paddingTop: 8, paddingHorizontal: 2 }}>
-              <Text style={s.cardStore}>{p.store}</Text>
-              <Text numberOfLines={1} style={s.cardName}>{p.name}</Text>
-              <View style={s.cardFootRow}>
-                <View>
-                  <View style={s.priceRow}>
-                    <Text style={s.priceNow}>AED {p.price}</Text>
-                    <Text style={s.priceWas}>AED {p.was}</Text>
-                  </View>
-                  <View style={s.endsRow}>
-                    <Ionicons name="time-outline" size={11} color="#64748B" />
-                    <Text style={s.endsText}>{p.endsIn}</Text>
-                  </View>
-                </View>
-                <Pressable
-                  onPress={(e) => {
-                    e.stopPropagation?.();
-                    add(p);
-                  }}
-                  style={s.addBtn}
-                  hitSlop={8}
-                >
-                  <Ionicons name="add" size={18} color="white" />
-                </Pressable>
-              </View>
-            </View>
-          </Pressable>
-        ))}
+      {/* Section: Fresh & Bakery */}
+      <Section
+        title="Fresh & Bakery 🥖"
+        sub="Today's best from our partners"
+        onSeeAll={() => router.push("/(tabs)/deals")}
+      />
+      <HScroll items={freshAndBakery} />
+
+      {/* Section: Beauty & Snacks */}
+      <Section
+        title="Beauty & Snacks"
+        sub="Treats worth saving"
+        onSeeAll={() => router.push("/(tabs)/deals")}
+      />
+      <HScroll items={beautyDeals} />
+    </ScrollView>
+  );
+}
+
+function Section({ title, sub, onSeeAll }: { title: string; sub?: string; onSeeAll?: () => void }) {
+  return (
+    <View style={s.sectionHead}>
+      <View style={{ flex: 1 }}>
+        <Text style={s.sectionTitle}>{title}</Text>
+        {sub && <Text style={s.sectionSub}>{sub}</Text>}
       </View>
+      {onSeeAll && (
+        <Pressable onPress={onSeeAll}>
+          <Text style={s.seeAll}>See all →</Text>
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
+function HScroll({ items }: { items: any[] }) {
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}
+    >
+      {items.map((p) => (
+        <ProductCard key={p.id} product={p} />
+      ))}
     </ScrollView>
   );
 }
@@ -196,6 +260,7 @@ const s = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 }, shadowRadius: 20, elevation: 4,
   },
   searchPlaceholder: { flex: 1, color: "#64748B", fontSize: 14 },
+  cursor: { color: "#FF6B2C", fontWeight: "800" },
   trustRow: {
     marginTop: 18, paddingHorizontal: 4,
     flexDirection: "row", justifyContent: "space-around", alignItems: "center",
@@ -244,40 +309,19 @@ const s = StyleSheet.create({
     paddingHorizontal: 16, marginTop: 24, marginBottom: 12,
   },
   sectionTitle: { fontSize: 18, fontWeight: "800", color: "#0F172A" },
-  seeAll: { color: "#FF6B2C", fontSize: 13, fontWeight: "700" },
-  grid: { paddingHorizontal: 16, flexDirection: "row", flexWrap: "wrap", gap: 12 },
-  card: { width: "47.5%" },
-  cardImg: {
-    aspectRatio: 1, borderRadius: 14, overflow: "hidden", backgroundColor: "#F1EFE8",
+  sectionSub: { fontSize: 12, color: "#64748B", marginTop: 2 },
+  seeAll: { color: "#FF6B2C", fontSize: 13, fontWeight: "800" },
+  proBanner: {
+    marginHorizontal: 16, marginTop: 24,
+    backgroundColor: "#0F172A", borderRadius: 16, padding: 18,
+    flexDirection: "row", alignItems: "center", gap: 16,
   },
-  discBadge: {
-    position: "absolute", top: 8, left: 8,
-    backgroundColor: "#FF6B2C",
-    paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6,
-  },
-  discText: { color: "white", fontSize: 11, fontWeight: "800" },
-  favBadge: {
-    position: "absolute", top: 8, right: 8,
-    width: 30, height: 30, borderRadius: 15,
-    backgroundColor: "rgba(255,255,255,0.95)",
-    alignItems: "center", justifyContent: "center",
-  },
-  cardStore: { fontSize: 9.5, fontWeight: "800", color: "#94A3B8", letterSpacing: 0.5 },
-  cardName: { fontSize: 13, fontWeight: "700", color: "#0F172A", marginTop: 2 },
-  priceRow: { flexDirection: "row", alignItems: "baseline", marginTop: 4, gap: 6 },
-  priceNow: { color: "#FF6B2C", fontSize: 15, fontWeight: "800" },
-  priceWas: { color: "#94A3B8", fontSize: 11, textDecorationLine: "line-through" },
-  endsRow: { flexDirection: "row", alignItems: "center", marginTop: 6, gap: 4 },
-  endsText: { fontSize: 10.5, color: "#64748B", fontWeight: "600" },
-  cardFootRow: {
-    flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end",
-  },
-  addBtn: {
-    width: 32, height: 32, borderRadius: 16,
+  proBannerTitle: { color: "white", fontSize: 16, fontWeight: "800" },
+  proBannerSub: { color: "rgba(255,255,255,0.78)", fontSize: 12, marginTop: 3 },
+  proBannerCta: { color: "#FFC857", fontSize: 13, fontWeight: "800", marginTop: 8 },
+  proBannerIcon: {
+    width: 52, height: 52, borderRadius: 14,
     backgroundColor: "#FF6B2C",
     alignItems: "center", justifyContent: "center",
-    shadowColor: "#FF6B2C", shadowOpacity: 0.3,
-    shadowOffset: { width: 0, height: 4 }, shadowRadius: 8,
-    elevation: 3,
   },
 });

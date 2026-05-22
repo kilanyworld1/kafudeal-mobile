@@ -1,8 +1,16 @@
-import { createContext, useContext, useState, useCallback, useRef, ReactNode } from "react";
-import { Animated } from "react-native";
+import { createContext, useContext, useState, useCallback, useRef, useEffect, ReactNode } from "react";
+import { View, Text, Image, Animated, StyleSheet, Pressable, Platform } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { Product } from "../data/products";
 
 type CartItem = { product: Product; qty: number };
+
+type Toast = {
+  id: number;
+  product?: Product;
+  message: string;
+  kind: "cart" | "info" | "save";
+};
 
 type CartContextValue = {
   items: CartItem[];
@@ -13,6 +21,12 @@ type CartContextValue = {
   setQty: (id: string, qty: number) => void;
   clear: () => void;
   badgeScale: Animated.Value;
+  // Saved (wishlist)
+  saved: string[];
+  toggleSaved: (id: string, name?: string) => void;
+  isSaved: (id: string) => boolean;
+  // Toast
+  showToast: (t: Omit<Toast, "id">) => void;
 };
 
 const CartContext = createContext<CartContextValue | null>(null);
@@ -22,14 +36,26 @@ export function CartProvider({ children }: { children: ReactNode }) {
     { product: require("../data/products").products[0], qty: 1 },
     { product: require("../data/products").products[1], qty: 1 },
   ]);
+  const [saved, setSaved] = useState<string[]>(["1", "3", "5"]);
+  const [toasts, setToasts] = useState<Toast[]>([]);
   const badgeScale = useRef(new Animated.Value(1)).current;
+  const toastId = useRef(0);
 
   const bump = () => {
     Animated.sequence([
-      Animated.timing(badgeScale, { toValue: 1.4, duration: 140, useNativeDriver: true }),
+      Animated.timing(badgeScale, { toValue: 1.45, duration: 140, useNativeDriver: true }),
       Animated.spring(badgeScale, { toValue: 1, friction: 4, useNativeDriver: true }),
     ]).start();
   };
+
+  const showToast = useCallback((t: Omit<Toast, "id">) => {
+    toastId.current += 1;
+    const id = toastId.current;
+    setToasts((prev) => [...prev, { ...t, id }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((x) => x.id !== id));
+    }, 2200);
+  }, []);
 
   const add = useCallback((p: Product) => {
     setItems((prev) => {
@@ -42,7 +68,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
       return [...prev, { product: p, qty: 1 }];
     });
     bump();
-  }, []);
+    showToast({ product: p, message: "Added to cart", kind: "cart" });
+  }, [showToast]);
 
   const remove = useCallback((id: string) => {
     setItems((prev) => prev.filter((it) => it.product.id !== id));
@@ -58,15 +85,142 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const clear = useCallback(() => setItems([]), []);
 
+  const toggleSaved = useCallback((id: string, name?: string) => {
+    setSaved((prev) => {
+      if (prev.includes(id)) {
+        showToast({ message: "Removed from saved", kind: "info" });
+        return prev.filter((x) => x !== id);
+      }
+      showToast({ message: name ? `${name} saved` : "Saved", kind: "save" });
+      return [...prev, id];
+    });
+  }, [showToast]);
+
+  const isSaved = useCallback((id: string) => saved.includes(id), [saved]);
+
   const count = items.reduce((a, b) => a + b.qty, 0);
   const subtotal = items.reduce((a, b) => a + b.qty * b.product.price, 0);
 
   return (
-    <CartContext.Provider value={{ items, count, subtotal, add, remove, setQty, clear, badgeScale }}>
+    <CartContext.Provider
+      value={{
+        items, count, subtotal,
+        add, remove, setQty, clear,
+        badgeScale,
+        saved, toggleSaved, isSaved,
+        showToast,
+      }}
+    >
       {children}
+      <ToastStack toasts={toasts} />
     </CartContext.Provider>
   );
 }
+
+function ToastStack({ toasts }: { toasts: Toast[] }) {
+  return (
+    <View pointerEvents="none" style={ts.stack}>
+      {toasts.map((t, i) => (
+        <ToastItem key={t.id} toast={t} index={i} />
+      ))}
+    </View>
+  );
+}
+
+function ToastItem({ toast, index }: { toast: Toast; index: number }) {
+  const translateY = useRef(new Animated.Value(-80)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(translateY, { toValue: 0, friction: 7, useNativeDriver: true }),
+      Animated.timing(opacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+    ]).start();
+    const t = setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(translateY, { toValue: -80, duration: 220, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0, duration: 220, useNativeDriver: true }),
+      ]).start();
+    }, 1900);
+    return () => clearTimeout(t);
+  }, []);
+
+  const bgColor =
+    toast.kind === "cart" ? "#FFFFFF"
+    : toast.kind === "save" ? "#FFFFFF"
+    : "#0F172A";
+  const textColor = toast.kind === "info" ? "white" : "#0F172A";
+  const iconBg =
+    toast.kind === "cart" ? "#FFE7D1"
+    : toast.kind === "save" ? "#FEE2E2"
+    : "rgba(255,255,255,0.18)";
+  const iconColor =
+    toast.kind === "cart" ? "#FF6B2C"
+    : toast.kind === "save" ? "#DC2626"
+    : "white";
+
+  return (
+    <Animated.View
+      style={[
+        ts.toast,
+        { backgroundColor: bgColor, transform: [{ translateY }], opacity, top: 50 + index * 64 },
+      ]}
+    >
+      {toast.product ? (
+        <Image source={{ uri: toast.product.image }} style={ts.img} />
+      ) : (
+        <View style={[ts.iconWrap, { backgroundColor: iconBg }]}>
+          <Ionicons
+            name={toast.kind === "save" ? "heart" : "checkmark-circle"}
+            size={20}
+            color={iconColor}
+          />
+        </View>
+      )}
+      <View style={{ flex: 1 }}>
+        <Text style={[ts.title, { color: textColor }]}>{toast.message}</Text>
+        {toast.product && (
+          <Text style={ts.sub} numberOfLines={1}>{toast.product.name}</Text>
+        )}
+      </View>
+      {toast.kind === "cart" && (
+        <View style={ts.checkBadge}>
+          <Ionicons name="checkmark" size={14} color="white" />
+        </View>
+      )}
+    </Animated.View>
+  );
+}
+
+const ts = StyleSheet.create({
+  stack: {
+    position: "absolute", top: 0, left: 12, right: 12,
+    zIndex: 9999, elevation: 9999,
+  },
+  toast: {
+    position: "absolute", left: 0, right: 0,
+    flexDirection: "row", alignItems: "center", gap: 12,
+    paddingVertical: 10, paddingHorizontal: 12,
+    borderRadius: 14,
+    shadowColor: "#0F172A", shadowOpacity: 0.18,
+    shadowOffset: { width: 0, height: 10 }, shadowRadius: 24,
+    elevation: 12,
+    borderWidth: Platform.OS === "android" ? 0.5 : 0,
+    borderColor: "rgba(15,23,42,0.06)",
+  },
+  img: { width: 44, height: 44, borderRadius: 10 },
+  iconWrap: {
+    width: 44, height: 44, borderRadius: 22,
+    alignItems: "center", justifyContent: "center",
+  },
+  title: { fontSize: 14, fontWeight: "800" },
+  sub: { fontSize: 12, color: "#64748B", marginTop: 2 },
+  checkBadge: {
+    width: 26, height: 26, borderRadius: 13,
+    backgroundColor: "#16A34A",
+    alignItems: "center", justifyContent: "center",
+  },
+});
 
 export function useCart() {
   const ctx = useContext(CartContext);

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef } from "react";
 import { View, Text, ScrollView, Image, Pressable, StyleSheet, Animated } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, router } from "expo-router";
@@ -10,13 +10,26 @@ export default function ProductDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const product = products.find((p) => p.id === id) || products[0];
-  const { add } = useCart();
-  const [added, setAdded] = useState(false);
+  const { add, toggleSaved, isSaved } = useCart();
+  const saved = isSaved(product.id);
 
-  const handleAdd = () => {
+  const heartScale = useRef(new Animated.Value(1)).current;
+  const addScale = useRef(new Animated.Value(1)).current;
+
+  const pressHeart = () => {
+    toggleSaved(product.id, product.name);
+    Animated.sequence([
+      Animated.timing(heartScale, { toValue: 1.4, duration: 140, useNativeDriver: true }),
+      Animated.spring(heartScale, { toValue: 1, friction: 4, useNativeDriver: true }),
+    ]).start();
+  };
+
+  const pressAdd = () => {
     add(product);
-    setAdded(true);
-    setTimeout(() => setAdded(false), 1400);
+    Animated.sequence([
+      Animated.timing(addScale, { toValue: 0.96, duration: 100, useNativeDriver: true }),
+      Animated.spring(addScale, { toValue: 1, friction: 4, useNativeDriver: true }),
+    ]).start();
   };
 
   return (
@@ -29,8 +42,14 @@ export default function ProductDetail() {
             <Pressable onPress={() => router.back()} style={s.topBtn}>
               <Ionicons name="chevron-back" size={22} color="#0F172A" />
             </Pressable>
-            <Pressable style={s.topBtn}>
-              <Ionicons name="heart-outline" size={20} color="#0F172A" />
+            <Pressable onPress={pressHeart} style={s.topBtn}>
+              <Animated.View style={{ transform: [{ scale: heartScale }] }}>
+                <Ionicons
+                  name={saved ? "heart" : "heart-outline"}
+                  size={20}
+                  color={saved ? "#DC2626" : "#0F172A"}
+                />
+              </Animated.View>
             </Pressable>
           </View>
 
@@ -47,7 +66,7 @@ export default function ProductDetail() {
             <Text style={s.priceNow}>AED {product.price}</Text>
             <Text style={s.priceWas}>AED {product.was}</Text>
             <View style={s.savePill}>
-              <Text style={s.savePillText}>Save {product.was - product.price} AED</Text>
+              <Text style={s.savePillText}>Save AED {product.was - product.price}</Text>
             </View>
           </View>
 
@@ -58,7 +77,7 @@ export default function ProductDetail() {
 
           <Text style={s.sectionLabel}>About this product</Text>
           <Text style={s.description}>
-            Stocked daily by our verified store partners. This product is near its expiry
+            Stocked daily by our verified store partners. This product is near its best-before
             date — perfectly safe to consume but priced to move so it doesn't go to waste.
             Every listing is checked by KafuDeal before going live.
           </Text>
@@ -82,17 +101,20 @@ export default function ProductDetail() {
 
       <View style={[s.bottomBar, { paddingBottom: insets.bottom + 12 }]}>
         <View style={s.bottomRow}>
-          <Pressable style={s.heartBtn}>
-            <Ionicons name="heart-outline" size={22} color="#0F172A" />
+          <Pressable onPress={pressHeart} style={s.heartBtn}>
+            <Animated.View style={{ transform: [{ scale: heartScale }] }}>
+              <Ionicons
+                name={saved ? "heart" : "heart-outline"}
+                size={22}
+                color={saved ? "#DC2626" : "#0F172A"}
+              />
+            </Animated.View>
           </Pressable>
-          <Pressable
-            onPress={handleAdd}
-            style={[s.addBtn, added && { backgroundColor: "#16A34A" }]}
-          >
-            <Ionicons name={added ? "checkmark-circle" : "cart"} size={20} color="white" />
-            <Text style={s.addBtnText}>
-              {added ? "Added to cart" : `Add to cart · AED ${product.price}`}
-            </Text>
+          <Pressable onPress={pressAdd} style={{ flex: 1 }}>
+            <Animated.View style={[s.addBtn, { transform: [{ scale: addScale }] }]}>
+              <Ionicons name="cart" size={20} color="white" />
+              <Text style={s.addBtnText}>Add to cart · AED {product.price}</Text>
+            </Animated.View>
           </Pressable>
         </View>
       </View>
@@ -111,7 +133,7 @@ const s = StyleSheet.create({
     width: 40, height: 40, borderRadius: 20,
     backgroundColor: "white",
     alignItems: "center", justifyContent: "center",
-    shadowColor: "#000", shadowOpacity: 0.15, shadowRadius: 8,
+    shadowColor: "#000", shadowOpacity: 0.15, shadowRadius: 8, elevation: 4,
   },
   heroBadge: {
     position: "absolute", left: 16,
@@ -155,7 +177,7 @@ const s = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
   },
   addBtn: {
-    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
     backgroundColor: "#FF6B2C", paddingVertical: 16, borderRadius: 14,
   },
   addBtnText: { color: "white", fontSize: 15, fontWeight: "800" },

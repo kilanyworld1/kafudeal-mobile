@@ -1,15 +1,22 @@
-import { View, Text, ScrollView, Pressable, Image, StyleSheet } from "react-native";
+import { useState } from "react";
+import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { products } from "../../data/products";
-import { useCart } from "../../lib/cart-context";
+import ProductCard from "../../components/ProductCard";
 
-const filters = ["All", "Snacks", "Fresh", "Bakery", "Dairy", "Beauty", "Drinks"];
+const FILTERS = ["All", "Ending soon", "Snacks", "Fresh", "Bakery", "Dairy", "Beauty"];
 
 export default function Deals() {
   const insets = useSafeAreaInsets();
-  const { add } = useCart();
+  const [filter, setFilter] = useState("All");
+
+  const filtered = products.filter((p) => {
+    if (filter === "All") return true;
+    if (filter === "Ending soon") return p.urgent;
+    return p.category === filter;
+  });
 
   return (
     <View style={s.root}>
@@ -19,7 +26,7 @@ export default function Deals() {
 
         <Pressable onPress={() => router.push("/search")} style={s.searchBar}>
           <Ionicons name="search" size={18} color="#64748B" />
-          <Text style={s.searchText}>Search…</Text>
+          <Text style={s.searchText}>Search snacks, brands, stores…</Text>
         </Pressable>
 
         <ScrollView
@@ -28,46 +35,27 @@ export default function Deals() {
           style={{ marginTop: 12, marginHorizontal: -20 }}
           contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }}
         >
-          {filters.map((f, i) => (
-            <Pressable key={f} style={[s.chip, i === 0 && s.chipActive]}>
-              <Text style={[s.chipText, i === 0 && s.chipTextActive]}>{f}</Text>
+          {FILTERS.map((f) => (
+            <Pressable
+              key={f}
+              onPress={() => setFilter(f)}
+              style={[s.chip, filter === f && s.chipActive]}
+            >
+              <Text style={[s.chipText, filter === f && s.chipTextActive]}>{f}</Text>
             </Pressable>
           ))}
         </ScrollView>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100, gap: 12 }}>
-        {products.map((p) => (
-          <Pressable key={p.id} onPress={() => router.push(`/product/${p.id}`)} style={s.row}>
-            <Image source={{ uri: p.image }} style={s.rowImg} />
-            <View style={s.rowInfo}>
-              <View>
-                <Text style={s.rowStore}>{p.store}</Text>
-                <Text style={s.rowName}>{p.name}</Text>
-              </View>
-              <View>
-                <View style={s.rowPrices}>
-                  <Text style={s.rowNow}>AED {p.price}</Text>
-                  <Text style={s.rowWas}>AED {p.was}</Text>
-                  <View style={s.savePill}>
-                    <Text style={s.savePillText}>-{p.discount}%</Text>
-                  </View>
-                </View>
-                <View style={s.rowEnds}>
-                  <Ionicons name="time-outline" size={11} color="#64748B" />
-                  <Text style={s.rowEndsText}>{p.endsIn}</Text>
-                </View>
-              </View>
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
+        <Text style={s.resultsCount}>{filtered.length} results</Text>
+        <View style={s.grid}>
+          {filtered.map((p) => (
+            <View key={p.id} style={{ width: "47.5%" }}>
+              <ProductCard product={p} />
             </View>
-            <Pressable
-              onPress={(e) => { e.stopPropagation?.(); add(p); }}
-              style={s.rowAddBtn}
-              hitSlop={8}
-            >
-              <Ionicons name="add" size={18} color="white" />
-            </Pressable>
-          </Pressable>
-        ))}
+          ))}
+        </View>
       </ScrollView>
     </View>
   );
@@ -94,33 +82,6 @@ const s = StyleSheet.create({
   chipActive: { backgroundColor: "#0F172A" },
   chipText: { color: "#334155", fontSize: 13, fontWeight: "700" },
   chipTextActive: { color: "white" },
-  row: {
-    backgroundColor: "white", borderRadius: 14, overflow: "hidden",
-    flexDirection: "row", gap: 12, padding: 10,
-    shadowColor: "#0F172A", shadowOpacity: 0.04,
-    shadowOffset: { width: 0, height: 2 }, shadowRadius: 6,
-  },
-  rowImg: { width: 90, height: 90, borderRadius: 10 },
-  rowInfo: { flex: 1, justifyContent: "space-between", paddingVertical: 2 },
-  rowStore: { fontSize: 9.5, fontWeight: "800", color: "#94A3B8", letterSpacing: 0.5 },
-  rowName: { fontSize: 14, fontWeight: "700", color: "#0F172A", marginTop: 3 },
-  rowPrices: { flexDirection: "row", alignItems: "baseline", gap: 6 },
-  rowNow: { color: "#FF6B2C", fontSize: 16, fontWeight: "800" },
-  rowWas: { color: "#94A3B8", fontSize: 12, textDecorationLine: "line-through" },
-  savePill: {
-    backgroundColor: "#ECFDF5", paddingHorizontal: 6, paddingVertical: 2,
-    borderRadius: 4, marginLeft: 4,
-  },
-  savePillText: { color: "#166534", fontSize: 10, fontWeight: "800" },
-  rowEnds: { flexDirection: "row", alignItems: "center", marginTop: 4, gap: 4 },
-  rowEndsText: { fontSize: 11, color: "#64748B", fontWeight: "600" },
-  rowAddBtn: {
-    position: "absolute", right: 12, bottom: 12,
-    width: 34, height: 34, borderRadius: 17,
-    backgroundColor: "#FF6B2C",
-    alignItems: "center", justifyContent: "center",
-    shadowColor: "#FF6B2C", shadowOpacity: 0.3,
-    shadowOffset: { width: 0, height: 4 }, shadowRadius: 8,
-    elevation: 3,
-  },
+  resultsCount: { fontSize: 13, color: "#64748B", marginBottom: 12, fontWeight: "600" },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 12, justifyContent: "space-between" },
 });
