@@ -1,11 +1,12 @@
-import { useEffect, useRef } from "react";
-import { View, Text, Pressable, ScrollView, StyleSheet, Animated, Easing } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { View, Text, Pressable, ScrollView, StyleSheet, Animated, Easing, ActivityIndicator } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import KafuMark from "../components/KafuMark";
+import { useAuth } from "../lib/auth-context";
 
 const EMOJIS = [
   { e: "🛒", top: 24, left: "18%" as const, delay: 0 },
@@ -17,6 +18,24 @@ const EMOJIS = [
 
 export default function Login() {
   const insets = useSafeAreaInsets();
+  const { signInWithGoogle, signInWithApple, signInWithFacebook, session } = useAuth();
+  const [busy, setBusy] = useState<"google" | "apple" | "facebook" | null>(null);
+
+  // When session lands, close the modal
+  useEffect(() => {
+    if (session) router.replace("/(tabs)");
+  }, [session]);
+
+  const handle = async (which: "google" | "apple" | "facebook") => {
+    setBusy(which);
+    try {
+      if (which === "google") await signInWithGoogle();
+      if (which === "apple") await signInWithApple();
+      if (which === "facebook") await signInWithFacebook();
+    } finally {
+      setBusy(null);
+    }
+  };
 
   return (
     <View style={s.root}>
@@ -55,30 +74,34 @@ export default function Login() {
             ))}
           </View>
 
-          {/* Social buttons */}
+          {/* Social buttons — only Google for now. Apple + Facebook
+              will be re-enabled once the providers are configured in Supabase. */}
           <Pressable
-            onPress={() => router.replace("/(tabs)")}
-            style={[s.socialBtn, { backgroundColor: "#000000" }]}
-          >
-            <AppleLogo />
-            <Text style={[s.socialText, { color: "white" }]}>Continue with Apple</Text>
-          </Pressable>
-
-          <Pressable
-            onPress={() => router.replace("/(tabs)")}
+            onPress={() => handle("google")}
+            disabled={busy !== null}
             style={[s.socialBtn, s.socialBtnOutline]}
           >
-            <GoogleLogo />
-            <Text style={s.socialText}>Continue with Google</Text>
+            {busy === "google" ? (
+              <ActivityIndicator color="#0F172A" />
+            ) : (
+              <>
+                <GoogleLogo />
+                <Text style={s.socialText}>Continue with Google</Text>
+              </>
+            )}
           </Pressable>
 
-          <Pressable
-            onPress={() => router.replace("/(tabs)")}
-            style={[s.socialBtn, { backgroundColor: "#1877F2" }]}
-          >
-            <FacebookLogo />
-            <Text style={[s.socialText, { color: "white" }]}>Continue with Facebook</Text>
-          </Pressable>
+          <View style={s.comingSoonRow}>
+            <View style={s.comingSoonChip}>
+              <AppleLogo dark />
+              <Text style={s.comingSoonText}>Apple</Text>
+            </View>
+            <View style={s.comingSoonChip}>
+              <FacebookLogo dark />
+              <Text style={s.comingSoonText}>Facebook</Text>
+            </View>
+            <Text style={s.comingSoonNote}>Coming soon</Text>
+          </View>
 
           <Text style={s.terms}>
             By continuing you agree to our{"\n"}
@@ -141,9 +164,9 @@ function FloatingEmoji({
   );
 }
 
-function AppleLogo() {
+function AppleLogo({ dark }: { dark?: boolean } = {}) {
   return (
-    <Svg width={20} height={20} viewBox="0 0 24 24" fill="white">
+    <Svg width={16} height={16} viewBox="0 0 24 24" fill={dark ? "#0F172A" : "white"}>
       <Path d="M17.5 12.5c0-3 2.4-5.5 5.5-5.5-1.6-2.4-4.4-4-7.5-4-2 0-3.9.7-5.4 1.9-1.5-1.2-3.4-1.9-5.4-1.9C2.4 3 0 5.5 0 8.5c0 4.7 5.6 11.4 9 14.5 1.4 1.3 3.6 1.3 5 0 .8-.7 1.7-1.6 2.6-2.6-1.4-2.5-2.1-5.3-2.1-7.9z" />
     </Svg>
   );
@@ -160,9 +183,9 @@ function GoogleLogo() {
   );
 }
 
-function FacebookLogo() {
+function FacebookLogo({ dark }: { dark?: boolean } = {}) {
   return (
-    <Svg width={20} height={20} viewBox="0 0 24 24" fill="white">
+    <Svg width={16} height={16} viewBox="0 0 24 24" fill={dark ? "#1877F2" : "white"}>
       <Path d="M24 12c0-6.63-5.37-12-12-12S0 5.37 0 12c0 5.99 4.39 10.95 10.13 11.85V15.47H7.08V12h3.05V9.36c0-3 1.79-4.67 4.53-4.67 1.31 0 2.69.24 2.69.24v2.95h-1.52c-1.49 0-1.96.93-1.96 1.88V12h3.33l-.53 3.47h-2.8v8.38C19.61 22.95 24 17.99 24 12z" />
     </Svg>
   );
@@ -213,6 +236,18 @@ const s = StyleSheet.create({
     borderWidth: 1.5, borderColor: "rgba(15,23,42,0.12)",
   },
   socialText: { fontSize: 14.5, fontWeight: "800", color: "#0F172A" },
+  comingSoonRow: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 8, marginTop: 14, marginBottom: 4,
+  },
+  comingSoonChip: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    paddingHorizontal: 10, paddingVertical: 6,
+    backgroundColor: "#F1F5F9", borderRadius: 999,
+    opacity: 0.7,
+  },
+  comingSoonText: { fontSize: 12, fontWeight: "700", color: "#64748B" },
+  comingSoonNote: { fontSize: 11, color: "#94A3B8", fontWeight: "600", marginLeft: 4 },
   terms: {
     textAlign: "center", color: "#94A3B8",
     fontSize: 11.5, marginTop: 20, lineHeight: 18,

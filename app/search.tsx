@@ -1,9 +1,10 @@
 import { useEffect, useState, useRef } from "react";
-import { View, Text, TextInput, ScrollView, Pressable, Image, StyleSheet } from "react-native";
+import { View, Text, TextInput, ScrollView, Pressable, Image, StyleSheet, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
-import { products } from "../data/products";
+import { productsAPI } from "../lib/api";
+import type { Product } from "../lib/types";
 
 const recents = ["Lindt chocolate", "Milk 2L", "Sourdough", "Cheese"];
 const trending = ["Iftar deals", "Strawberries", "Nivea", "Yogurt", "Sushi"];
@@ -19,6 +20,9 @@ export default function Search() {
   const insets = useSafeAreaInsets();
   const [q, setQ] = useState("");
   const [placeholder, setPlaceholder] = useState("");
+  const [results, setResults] = useState<Product[]>([]);
+  const [searching, setSearching] = useState(false);
+  const debounce = useRef<any>(null);
 
   // Typewriter loop
   useEffect(() => {
@@ -48,9 +52,21 @@ export default function Search() {
     return () => clearTimeout(timer);
   }, []);
 
-  const results = q
-    ? products.filter((p) => p.name.toLowerCase().includes(q.toLowerCase()))
-    : [];
+  // Debounced live search
+  useEffect(() => {
+    clearTimeout(debounce.current);
+    if (!q.trim()) {
+      setResults([]);
+      return;
+    }
+    setSearching(true);
+    debounce.current = setTimeout(async () => {
+      const { data } = await productsAPI.search(q.trim());
+      setResults(data);
+      setSearching(false);
+    }, 300);
+    return () => clearTimeout(debounce.current);
+  }, [q]);
 
   return (
     <View style={[s.root, { paddingTop: insets.top }]}>
@@ -88,7 +104,6 @@ export default function Search() {
                 <Ionicons name="arrow-up-outline" size={16} color="#94A3B8" style={{ transform: [{ rotate: "45deg" }] }} />
               </Pressable>
             ))}
-
             <Text style={[s.section, { marginTop: 18 }]}>TRENDING NOW</Text>
             <View style={s.chips}>
               {trending.map((t) => (
@@ -99,6 +114,11 @@ export default function Search() {
               ))}
             </View>
           </>
+        ) : searching ? (
+          <View style={{ padding: 30, alignItems: "center" }}>
+            <ActivityIndicator color="#FF6B2C" />
+            <Text style={{ color: "#94A3B8", marginTop: 10 }}>Searching…</Text>
+          </View>
         ) : (
           <>
             <Text style={s.section}>{results.length} RESULTS FOR "{q.toUpperCase()}"</Text>
@@ -119,8 +139,8 @@ export default function Search() {
                     <Text style={s.resultStore}>{p.store}</Text>
                     <Text style={s.resultName}>{p.name}</Text>
                     <View style={s.priceRow}>
-                      <Text style={s.priceNow}>AED {p.price}</Text>
-                      <Text style={s.priceWas}>AED {p.was}</Text>
+                      <Text style={s.priceNow}>AED {p.discountedPrice}</Text>
+                      <Text style={s.priceWas}>AED {p.originalPrice}</Text>
                     </View>
                   </View>
                 </Pressable>
@@ -161,7 +181,7 @@ const s = StyleSheet.create({
     flexDirection: "row", gap: 12, alignItems: "center", padding: 10,
     backgroundColor: "white", borderRadius: 12, marginBottom: 8,
   },
-  resultImg: { width: 56, height: 56, borderRadius: 8 },
+  resultImg: { width: 56, height: 56, borderRadius: 8, backgroundColor: "#F1EFE8" },
   resultStore: { fontSize: 9.5, fontWeight: "800", color: "#94A3B8", letterSpacing: 0.5 },
   resultName: { fontSize: 14, fontWeight: "700", color: "#0F172A", marginTop: 2 },
   priceRow: { flexDirection: "row", alignItems: "baseline", marginTop: 4, gap: 6 },

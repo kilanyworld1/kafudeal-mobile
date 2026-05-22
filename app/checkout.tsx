@@ -1,9 +1,11 @@
 import { useState } from "react";
-import { View, Text, ScrollView, Pressable, TextInput, StyleSheet, Image } from "react-native";
+import { View, Text, ScrollView, Pressable, TextInput, StyleSheet, Image, ActivityIndicator, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { useCart } from "../lib/cart-context";
+import { useAuth } from "../lib/auth-context";
+import { ordersAPI } from "../lib/api";
 
 const addresses = [
   { id: "a1", label: "Home", line: "Marina Towers, Tower 3, Apt 1402", area: "Dubai Marina · JLT", default: true },
@@ -19,19 +21,50 @@ const payments = [
 export default function Checkout() {
   const insets = useSafeAreaInsets();
   const { items, subtotal, clear } = useCart();
+  const { customer } = useAuth();
   const [addr, setAddr] = useState("a1");
   const [pay, setPay] = useState("p1");
   const [voucher, setVoucher] = useState("");
   const [vApplied, setVApplied] = useState(false);
+  const [placing, setPlacing] = useState(false);
 
-  const delivery = 15;
+  const delivery = subtotal >= 100 ? 0 : 15;
   const discount = vApplied ? 5 : 0;
   const total = Math.max(0, subtotal + delivery - discount);
 
-  const placeOrder = () => {
-    const orderId = "K" + Math.floor(100000 + Math.random() * 900000).toString();
+  const placeOrder = async () => {
+    if (items.length === 0) return;
+
+    // Without a logged-in customer, just simulate the order locally
+    if (!customer?.id) {
+      const orderId = "K" + Math.floor(100000 + Math.random() * 900000).toString();
+      clear();
+      router.replace(`/order/${orderId}`);
+      return;
+    }
+
+    setPlacing(true);
+    const { data, error } = await ordersAPI.createOrder({
+      customer_id: customer.id,
+      subtotal,
+      delivery_fee: delivery,
+      total,
+      payment_method: payments.find((p) => p.id === pay)?.label || "Card",
+      voucher_code: vApplied ? voucher : undefined,
+      items: items.map((it) => ({
+        product_id: it.product.id,
+        quantity: it.qty,
+        price: it.product.discountedPrice,
+      })),
+    });
+    setPlacing(false);
+
+    if (error || !data) {
+      Alert.alert("Couldn't place order", (error as any)?.message || "Please try again.");
+      return;
+    }
     clear();
-    router.replace(`/order/${orderId}`);
+    router.replace(`/order/${data.id}`);
   };
 
   return (
@@ -187,10 +220,14 @@ export default function Checkout() {
       </ScrollView>
 
       <View style={[s.bottomBar, { paddingBottom: insets.bottom + 12 }]}>
-        <Pressable onPress={placeOrder} style={s.placeBtn} disabled={items.length === 0}>
-          <Text style={s.placeBtnText}>
-            {items.length === 0 ? "Cart is empty" : `Place order · AED ${total.toFixed(2)}`}
-          </Text>
+        <Pressable onPress={placeOrder} style={[s.placeBtn, (items.length === 0 || placing) && { opacity: 0.6 }]} disabled={items.length === 0 || placing}>
+          {placing ? (
+            <ActivityIndicator color="white" />
+          ) : (
+            <Text style={s.placeBtnText}>
+              {items.length === 0 ? "Cart is empty" : `Place order · AED ${total.toFixed(2)}`}
+            </Text>
+          )}
         </Pressable>
       </View>
     </View>

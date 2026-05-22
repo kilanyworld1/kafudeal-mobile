@@ -1,15 +1,32 @@
-import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
+import { useEffect, useState, useMemo } from "react";
+import { View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
-import { products } from "../data/products";
+import { productsAPI } from "../lib/api";
+import type { Product } from "../lib/types";
 import { useCart } from "../lib/cart-context";
 import ProductCard from "../components/ProductCard";
 
 export default function Saved() {
   const insets = useSafeAreaInsets();
   const { saved } = useCart();
-  const items = products.filter((p) => saved.includes(p.id));
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      const { data } = await productsAPI.getProducts({ from: 0, to: 200 });
+      setAllProducts(data);
+      setLoading(false);
+    })();
+  }, []);
+
+  const items = useMemo(
+    () => allProducts.filter((p) => saved.includes(p.id)),
+    [allProducts, saved]
+  );
 
   return (
     <View style={s.root}>
@@ -21,7 +38,12 @@ export default function Saved() {
         <View style={{ width: 36 }} />
       </View>
 
-      {items.length === 0 ? (
+      {loading ? (
+        <View style={s.empty}>
+          <ActivityIndicator color="#FF6B2C" size="large" />
+          <Text style={s.emptySub}>Loading…</Text>
+        </View>
+      ) : items.length === 0 ? (
         <View style={s.empty}>
           <Text style={{ fontSize: 56 }}>💝</Text>
           <Text style={s.emptyTitle}>No saved deals yet</Text>

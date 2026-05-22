@@ -2,7 +2,7 @@ import { useRef } from "react";
 import { View, Text, Image, Pressable, StyleSheet, Animated } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { Product } from "../data/products";
+import type { Product } from "../lib/types";
 import { useCart } from "../lib/cart-context";
 
 type Props = {

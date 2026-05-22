@@ -1,28 +1,52 @@
-import { useState } from "react";
-import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
+import { useEffect, useState, useMemo } from "react";
+import { View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
-import { products } from "../../data/products";
+import { productsAPI, categoriesAPI } from "../../lib/api";
+import type { Product, Category } from "../../lib/types";
 import ProductCard from "../../components/ProductCard";
-
-const FILTERS = ["All", "Ending soon", "Snacks", "Fresh", "Bakery", "Dairy", "Beauty"];
 
 export default function Deals() {
   const insets = useSafeAreaInsets();
   const [filter, setFilter] = useState("All");
+  const [products, setProducts] = useState<Product[]>([]);
+  const [cats, setCats] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filtered = products.filter((p) => {
-    if (filter === "All") return true;
-    if (filter === "Ending soon") return p.urgent;
-    return p.category === filter;
-  });
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      const [{ data: prods }, { data: c }] = await Promise.all([
+        productsAPI.getProducts({ from: 0, to: 200, excludeExpired: true }),
+        categoriesAPI.getCategories(),
+      ]);
+      setProducts(prods);
+      setCats(c);
+      setLoading(false);
+    })();
+  }, []);
+
+  const filters = useMemo(() => {
+    const dynamicCats = cats.slice(0, 6).map((c) => c.name);
+    return ["All", "Ending soon", ...dynamicCats];
+  }, [cats]);
+
+  const filtered = useMemo(() => {
+    return products.filter((p) => {
+      if (filter === "All") return true;
+      if (filter === "Ending soon") return p.urgent;
+      return p.category === filter;
+    });
+  }, [products, filter]);
 
   return (
     <View style={s.root}>
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>
         <Text style={s.title}>Deals</Text>
-        <Text style={s.subtitle}>{products.length} deals near you · ending soon</Text>
+        <Text style={s.subtitle}>
+          {products.length} deals near you · ending soon
+        </Text>
 
         <Pressable onPress={() => router.push("/search")} style={s.searchBar}>
           <Ionicons name="search" size={18} color="#64748B" />
@@ -35,7 +59,7 @@ export default function Deals() {
           style={{ marginTop: 12, marginHorizontal: -20 }}
           contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }}
         >
-          {FILTERS.map((f) => (
+          {filters.map((f) => (
             <Pressable
               key={f}
               onPress={() => setFilter(f)}
@@ -47,16 +71,26 @@ export default function Deals() {
         </ScrollView>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
-        <Text style={s.resultsCount}>{filtered.length} results</Text>
-        <View style={s.grid}>
-          {filtered.map((p) => (
-            <View key={p.id} style={{ width: "47.5%" }}>
-              <ProductCard product={p} />
-            </View>
-          ))}
+      {loading ? (
+        <View style={s.loading}>
+          <ActivityIndicator color="#FF6B2C" size="large" />
+          <Text style={s.loadingText}>Loading deals…</Text>
         </View>
-      </ScrollView>
+      ) : (
+        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
+          <Text style={s.resultsCount}>{filtered.length} results</Text>
+          <View style={s.grid}>
+            {filtered.map((p) => (
+              <View key={p.id} style={{ width: "47.5%" }}>
+                <ProductCard product={p} />
+              </View>
+            ))}
+          </View>
+          {filtered.length === 0 && (
+            <Text style={s.empty}>No deals match this filter</Text>
+          )}
+        </ScrollView>
+      )}
     </View>
   );
 }
@@ -82,6 +116,9 @@ const s = StyleSheet.create({
   chipActive: { backgroundColor: "#0F172A" },
   chipText: { color: "#334155", fontSize: 13, fontWeight: "700" },
   chipTextActive: { color: "white" },
+  loading: { padding: 60, alignItems: "center" },
+  loadingText: { fontSize: 13, color: "#64748B", marginTop: 14 },
   resultsCount: { fontSize: 13, color: "#64748B", marginBottom: 12, fontWeight: "600" },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 12, justifyContent: "space-between" },
+  empty: { textAlign: "center", color: "#94A3B8", marginTop: 40, fontSize: 13 },
 });

@@ -2,6 +2,7 @@ import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
+import { useAuth } from "../../lib/auth-context";
 
 type MenuItem = {
   icon: string;
@@ -28,17 +29,27 @@ const SECONDARY_MENU: MenuItem[] = [
 
 export default function Account() {
   const insets = useSafeAreaInsets();
+  const { user, customer, signOut } = useAuth();
+
+  const displayName = customer?.fullName
+    || (user?.user_metadata?.full_name as string)
+    || user?.email?.split("@")[0]
+    || "Guest";
+  const initial = displayName.charAt(0).toUpperCase();
+  const isLoggedIn = !!user;
 
   return (
     <ScrollView style={s.root} contentContainerStyle={{ paddingBottom: 60 }}>
       {/* Header with avatar */}
       <View style={[s.header, { paddingTop: insets.top + 16 }]}>
         <View style={s.avatar}>
-          <Text style={s.avatarText}>M</Text>
+          <Text style={s.avatarText}>{initial}</Text>
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={s.name}>Mohamed Kilany</Text>
-          <Text style={s.country}>🇦🇪 United Arab Emirates</Text>
+          <Text style={s.name}>{displayName}</Text>
+          <Text style={s.country}>
+            {isLoggedIn ? (user?.email || "🇦🇪 United Arab Emirates") : "Not signed in"}
+          </Text>
         </View>
         <Pressable onPress={() => router.push("/settings")} style={s.gearBtn}>
           <Ionicons name="settings-outline" size={20} color="#0F172A" />
@@ -118,12 +129,18 @@ export default function Account() {
         ))}
       </View>
 
-      {/* Sign out */}
+      {/* Sign in / Sign out */}
       <Pressable
-        onPress={() => router.push("/login")}
+        onPress={async () => {
+          if (isLoggedIn) {
+            await signOut();
+          } else {
+            router.push("/login");
+          }
+        }}
         style={s.signOutBtn}
       >
-        <Text style={s.signOutText}>Sign out</Text>
+        <Text style={s.signOutText}>{isLoggedIn ? "Sign out" : "Sign in"}</Text>
       </Pressable>
 
       <Text style={s.versionText}>KafuDeal v0.1.0 · UAE</Text>

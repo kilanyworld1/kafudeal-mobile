@@ -1,22 +1,36 @@
-import { useRef } from "react";
-import { View, Text, ScrollView, Image, Pressable, StyleSheet, Animated } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { View, Text, ScrollView, Image, Pressable, StyleSheet, Animated, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { products } from "../../data/products";
+import { productsAPI } from "../../lib/api";
+import type { Product } from "../../lib/types";
 import { useCart } from "../../lib/cart-context";
 
 export default function ProductDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
-  const product = products.find((p) => p.id === id) || products[0];
   const { add, toggleSaved, isSaved } = useCart();
-  const saved = isSaved(product.id);
+  const [product, setProduct] = useState<Product | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const heartScale = useRef(new Animated.Value(1)).current;
   const addScale = useRef(new Animated.Value(1)).current;
 
+  useEffect(() => {
+    if (!id) return;
+    (async () => {
+      setLoading(true);
+      const { data } = await productsAPI.getProductById(String(id));
+      setProduct(data);
+      setLoading(false);
+    })();
+  }, [id]);
+
+  const saved = product ? isSaved(product.id) : false;
+
   const pressHeart = () => {
+    if (!product) return;
     toggleSaved(product.id, product.name);
     Animated.sequence([
       Animated.timing(heartScale, { toValue: 1.4, duration: 140, useNativeDriver: true }),
@@ -25,12 +39,36 @@ export default function ProductDetail() {
   };
 
   const pressAdd = () => {
+    if (!product) return;
     add(product);
     Animated.sequence([
       Animated.timing(addScale, { toValue: 0.96, duration: 100, useNativeDriver: true }),
       Animated.spring(addScale, { toValue: 1, friction: 4, useNativeDriver: true }),
     ]).start();
   };
+
+  if (loading) {
+    return (
+      <View style={s.loading}>
+        <ActivityIndicator color="#FF6B2C" size="large" />
+        <Text style={{ color: "#64748B", marginTop: 14 }}>Loading…</Text>
+      </View>
+    );
+  }
+
+  if (!product) {
+    return (
+      <View style={s.loading}>
+        <Ionicons name="alert-circle-outline" size={48} color="#94A3B8" />
+        <Text style={{ color: "#0F172A", fontSize: 16, marginTop: 12, fontWeight: "800" }}>
+          Product not found
+        </Text>
+        <Pressable onPress={() => router.back()} style={s.backCta}>
+          <Text style={s.backCtaText}>Go back</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   return (
     <View style={s.root}>
@@ -54,7 +92,7 @@ export default function ProductDetail() {
           </View>
 
           <View style={[s.heroBadge, { top: insets.top + 60 }]}>
-            <Text style={s.heroBadgeText}>-{product.discount}% OFF</Text>
+            <Text style={s.heroBadgeText}>-{product.discountPercentage}% OFF</Text>
           </View>
         </View>
 
@@ -63,24 +101,37 @@ export default function ProductDetail() {
           <Text style={s.name}>{product.name}</Text>
 
           <View style={s.priceRow}>
-            <Text style={s.priceNow}>AED {product.price}</Text>
-            <Text style={s.priceWas}>AED {product.was}</Text>
+            <Text style={s.priceNow}>AED {product.discountedPrice}</Text>
+            <Text style={s.priceWas}>AED {product.originalPrice}</Text>
             <View style={s.savePill}>
-              <Text style={s.savePillText}>Save AED {product.was - product.price}</Text>
+              <Text style={s.savePillText}>
+                Save AED {Math.max(0, product.originalPrice - product.discountedPrice).toFixed(0)}
+              </Text>
             </View>
           </View>
 
           <View style={s.urgency}>
             <Ionicons name="time" size={16} color="#FF6B2C" />
-            <Text style={s.urgencyText}>{product.endsIn} · 12 left in stock</Text>
+            <Text style={s.urgencyText}>
+              {product.endsIn} {product.stock > 0 ? `· ${product.stock} left in stock` : ""}
+            </Text>
           </View>
 
-          <Text style={s.sectionLabel}>About this product</Text>
-          <Text style={s.description}>
-            Stocked daily by our verified store partners. This product is near its best-before
-            date — perfectly safe to consume but priced to move so it doesn't go to waste.
-            Every listing is checked by KafuDeal before going live.
-          </Text>
+          {product.description ? (
+            <>
+              <Text style={s.sectionLabel}>About this product</Text>
+              <Text style={s.description}>{product.description}</Text>
+            </>
+          ) : (
+            <>
+              <Text style={s.sectionLabel}>About this product</Text>
+              <Text style={s.description}>
+                Stocked daily by our verified store partners. This product is near its best-before
+                date — perfectly safe to consume but priced to move so it doesn't go to waste.
+                Every listing is checked by KafuDeal before going live.
+              </Text>
+            </>
+          )}
 
           <View style={s.trustRow}>
             <View style={s.trustBox}>
@@ -113,7 +164,7 @@ export default function ProductDetail() {
           <Pressable onPress={pressAdd} style={{ flex: 1 }}>
             <Animated.View style={[s.addBtn, { transform: [{ scale: addScale }] }]}>
               <Ionicons name="cart" size={20} color="white" />
-              <Text style={s.addBtnText}>Add to cart · AED {product.price}</Text>
+              <Text style={s.addBtnText}>Add to cart · AED {product.discountedPrice}</Text>
             </Animated.View>
           </Pressable>
         </View>
@@ -124,6 +175,15 @@ export default function ProductDetail() {
 
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#FFF9F2" },
+  loading: {
+    flex: 1, alignItems: "center", justifyContent: "center",
+    backgroundColor: "#FFF9F2", padding: 40,
+  },
+  backCta: {
+    marginTop: 18, backgroundColor: "#FF6B2C",
+    paddingHorizontal: 22, paddingVertical: 12, borderRadius: 10,
+  },
+  backCtaText: { color: "white", fontWeight: "800" },
   hero: { height: 380, backgroundColor: "#F1EFE8" },
   topBar: {
     position: "absolute", left: 16, right: 16,

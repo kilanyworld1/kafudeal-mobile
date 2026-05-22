@@ -1,14 +1,13 @@
-import { useEffect, useState, useRef } from "react";
-import { View, Text, ScrollView, Pressable, Image, StyleSheet, Animated } from "react-native";
+import { useEffect, useState, useMemo } from "react";
+import { View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
-import {
-  products, categories,
-  endingSoon, topDeals, freshAndBakery, beautyDeals,
-} from "../../data/products";
-import { useCart } from "../../lib/cart-context";
+import { productsAPI, categoriesAPI } from "../../lib/api";
+import type { Product, Category } from "../../lib/types";
+import { useAuth } from "../../lib/auth-context";
+import { categories as STATIC_CATS } from "../../data/products";
 import ProductCard from "../../components/ProductCard";
 
 const PHRASES = [
@@ -21,10 +20,13 @@ const PHRASES = [
 
 export default function Home() {
   const insets = useSafeAreaInsets();
-  const { count } = useCart();
+  const { user, customer } = useAuth();
   const [placeholder, setPlaceholder] = useState("");
+  const [products, setProducts] = useState<Product[]>([]);
+  const [liveCategories, setLiveCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Typewriter loop in the search bar
+  // Typewriter loop
   useEffect(() => {
     let pi = 0, ci = 0, deleting = false;
     let timer: any;
@@ -51,6 +53,53 @@ export default function Home() {
     tick();
     return () => clearTimeout(timer);
   }, []);
+
+  // Fetch live data
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      const [{ data: prods }, { data: cats }] = await Promise.all([
+        productsAPI.getProducts({ from: 0, to: 60, excludeExpired: true }),
+        categoriesAPI.getCategories(),
+      ]);
+      setProducts(prods);
+      setLiveCategories(cats);
+      setLoading(false);
+    })();
+  }, []);
+
+  // Curate sections from live data
+  const sections = useMemo(() => {
+    const endingSoon = [...products]
+      .filter((p) => p.urgent)
+      .slice(0, 12);
+    const topDeals = [...products]
+      .sort((a, b) => b.discount - a.discount)
+      .slice(0, 12);
+    const freshAndBakery = products.filter(
+      (p) => p.category === "Fresh" || p.category === "Bakery"
+    ).slice(0, 12);
+    const beautyAndSnacks = products.filter(
+      (p) => p.category === "Beauty" || p.category === "Snacks"
+    ).slice(0, 12);
+    return { endingSoon, topDeals, freshAndBakery, beautyAndSnacks };
+  }, [products]);
+
+  // Merge live categories with static icon metadata
+  const displayCategories = useMemo(() => {
+    if (liveCategories.length === 0) return STATIC_CATS;
+    return liveCategories.slice(0, 7).map((c) => {
+      const match = STATIC_CATS.find((s) => s.label.toLowerCase() === c.name.toLowerCase());
+      return {
+        key: c.id,
+        label: c.name,
+        emoji: c.icon || match?.emoji || "🛒",
+        tint: match?.tint || "#FFE7D1",
+        tag: match?.tag,
+        hot: match?.hot,
+      };
+    });
+  }, [liveCategories]);
 
   return (
     <ScrollView
@@ -86,7 +135,7 @@ export default function Home() {
           </View>
         </View>
 
-        {/* Search bar with typewriter placeholder */}
+        {/* Search bar */}
         <Pressable onPress={() => router.push("/search")} style={s.search}>
           <Ionicons name="search" size={20} color="#334155" />
           <Text style={s.searchPlaceholder}>
@@ -110,14 +159,14 @@ export default function Home() {
         </View>
       </LinearGradient>
 
-      {/* Category chips */}
+      {/* Categories */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}
         style={{ marginTop: -28 }}
       >
-        {categories.map((c) => (
+        {displayCategories.map((c) => (
           <Pressable
             key={c.key}
             onPress={() => router.push("/(tabs)/deals")}
@@ -136,66 +185,91 @@ export default function Home() {
         ))}
       </ScrollView>
 
-      {/* Sign-in pill */}
-      <Pressable
-        onPress={() => router.push("/login")}
-        style={s.signinCard}
-      >
-        <View style={s.signinIcon}>
-          <Ionicons name="person" size={22} color="#FF6B2C" />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={s.signinTitle}>Hey there! 👋</Text>
-          <Text style={s.signinSub}>Sign in for personalised deals & order tracking</Text>
-        </View>
-        <View style={s.signinBtn}>
-          <Text style={s.signinBtnText}>Sign in</Text>
-        </View>
-      </Pressable>
+      {/* Sign-in pill (only if not logged in) */}
+      {!user && (
+        <Pressable onPress={() => router.push("/login")} style={s.signinCard}>
+          <View style={s.signinIcon}>
+            <Ionicons name="person" size={22} color="#FF6B2C" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.signinTitle}>Hey there! 👋</Text>
+            <Text style={s.signinSub}>Sign in for personalised deals & order tracking</Text>
+          </View>
+          <View style={s.signinBtn}>
+            <Text style={s.signinBtnText}>Sign in</Text>
+          </View>
+        </Pressable>
+      )}
 
-      {/* Section: Ending soon */}
-      <Section
-        title="Ending soon 🔥"
-        sub="Grab these before they're gone"
-        onSeeAll={() => router.push("/(tabs)/deals")}
-      />
-      <HScroll items={endingSoon} />
-
-      {/* Section: Top deals */}
-      <Section
-        title="Top deals near you"
-        sub="Biggest discounts today"
-        onSeeAll={() => router.push("/(tabs)/deals")}
-      />
-      <HScroll items={topDeals} />
-
-      {/* Banner */}
-      <View style={s.proBanner}>
-        <View style={{ flex: 1 }}>
-          <Text style={s.proBannerTitle}>KafuDeal Pro</Text>
-          <Text style={s.proBannerSub}>Free delivery + early access to drops</Text>
-          <Text style={s.proBannerCta}>Try free for 30 days →</Text>
+      {user && customer && (
+        <View style={s.welcomeBack}>
+          <Text style={s.welcomeBackText}>
+            Welcome back, {customer.fullName?.split(" ")[0] || "friend"} 👋
+          </Text>
         </View>
-        <View style={s.proBannerIcon}>
-          <Ionicons name="star" size={24} color="white" />
+      )}
+
+      {loading ? (
+        <View style={s.loadingBlock}>
+          <ActivityIndicator color="#FF6B2C" size="large" />
+          <Text style={s.loadingText}>Finding fresh deals…</Text>
         </View>
-      </View>
+      ) : products.length === 0 ? (
+        <View style={s.loadingBlock}>
+          <Ionicons name="cloud-offline-outline" size={42} color="#94A3B8" />
+          <Text style={s.loadingText}>No deals available right now</Text>
+          <Text style={s.loadingSub}>Pull to refresh or check back later</Text>
+        </View>
+      ) : (
+        <>
+          <Section
+            title="Ending soon 🔥"
+            sub="Grab these before they're gone"
+            onSeeAll={() => router.push("/(tabs)/deals")}
+          />
+          <HScroll items={sections.endingSoon.length ? sections.endingSoon : products.slice(0, 8)} />
 
-      {/* Section: Fresh & Bakery */}
-      <Section
-        title="Fresh & Bakery 🥖"
-        sub="Today's best from our partners"
-        onSeeAll={() => router.push("/(tabs)/deals")}
-      />
-      <HScroll items={freshAndBakery} />
+          <Section
+            title="Top deals near you"
+            sub="Biggest discounts today"
+            onSeeAll={() => router.push("/(tabs)/deals")}
+          />
+          <HScroll items={sections.topDeals} />
 
-      {/* Section: Beauty & Snacks */}
-      <Section
-        title="Beauty & Snacks"
-        sub="Treats worth saving"
-        onSeeAll={() => router.push("/(tabs)/deals")}
-      />
-      <HScroll items={beautyDeals} />
+          <View style={s.proBanner}>
+            <View style={{ flex: 1 }}>
+              <Text style={s.proBannerTitle}>KafuDeal Pro</Text>
+              <Text style={s.proBannerSub}>Free delivery + early access to drops</Text>
+              <Text style={s.proBannerCta}>Try free for 30 days →</Text>
+            </View>
+            <View style={s.proBannerIcon}>
+              <Ionicons name="star" size={24} color="white" />
+            </View>
+          </View>
+
+          {sections.freshAndBakery.length > 0 && (
+            <>
+              <Section
+                title="Fresh & Bakery 🥖"
+                sub="Today's best from our partners"
+                onSeeAll={() => router.push("/(tabs)/deals")}
+              />
+              <HScroll items={sections.freshAndBakery} />
+            </>
+          )}
+
+          {sections.beautyAndSnacks.length > 0 && (
+            <>
+              <Section
+                title="Beauty & Snacks"
+                sub="Treats worth saving"
+                onSeeAll={() => router.push("/(tabs)/deals")}
+              />
+              <HScroll items={sections.beautyAndSnacks} />
+            </>
+          )}
+        </>
+      )}
     </ScrollView>
   );
 }
@@ -216,7 +290,7 @@ function Section({ title, sub, onSeeAll }: { title: string; sub?: string; onSeeA
   );
 }
 
-function HScroll({ items }: { items: any[] }) {
+function HScroll({ items }: { items: Product[] }) {
   return (
     <ScrollView
       horizontal
@@ -304,6 +378,11 @@ const s = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999,
   },
   signinBtnText: { color: "white", fontSize: 12, fontWeight: "800" },
+  welcomeBack: { paddingHorizontal: 20, marginTop: 14 },
+  welcomeBackText: { fontSize: 15, fontWeight: "800", color: "#0F172A" },
+  loadingBlock: { padding: 60, alignItems: "center", justifyContent: "center" },
+  loadingText: { fontSize: 14, color: "#64748B", marginTop: 14, fontWeight: "600" },
+  loadingSub: { fontSize: 12, color: "#94A3B8", marginTop: 6 },
   sectionHead: {
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",
     paddingHorizontal: 16, marginTop: 24, marginBottom: 12,

@@ -1,12 +1,14 @@
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { AuthProvider } from "../lib/auth-context";
 import { CartProvider } from "../lib/cart-context";
 
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <CartProvider>
+      <AuthProvider>
+        <CartProvider>
         <StatusBar style="light" />
         <Stack screenOptions={{ headerShown: false, animation: "slide_from_right" }}>
           <Stack.Screen name="index" options={{ animation: "fade" }} />
@@ -25,7 +27,8 @@ export default function RootLayout() {
           <Stack.Screen name="settings" />
           <Stack.Screen name="help" />
         </Stack>
-      </CartProvider>
+        </CartProvider>
+      </AuthProvider>
     </GestureHandlerRootView>
   );
 }

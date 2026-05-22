@@ -1,67 +1,52 @@
-import { useState } from "react";
-import { View, Text, ScrollView, Pressable, Image, StyleSheet } from "react-native";
+import { useEffect, useState, useMemo } from "react";
+import { View, Text, ScrollView, Pressable, Image, StyleSheet, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
+import { ordersAPI } from "../../lib/api";
+import { useAuth } from "../../lib/auth-context";
+import type { Order } from "../../lib/types";
 
-const ACTIVE = [
-  {
-    id: "KFD-A3F8B921",
-    date: "5 May 2026 · 14:23",
-    total: 62.40,
-    status: "PREPARING",
-    statusColor: "#B45309",
-    statusBg: "rgba(245,158,11,0.15)",
-    items: 3,
-    images: [
-      "https://images.unsplash.com/photo-1481391319762-47dff72954d9?w=200&q=80",
-      "https://images.unsplash.com/photo-1550583724-b2692b85b150?w=200&q=80",
-      "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=200&q=80",
-    ],
-  },
-];
-
-const PAST = [
-  {
-    id: "KFD-2D9F1C44",
-    date: "3 May 2026 · 5 items",
-    total: 84.50,
-    status: "DELIVERED",
-    statusColor: "#15803D",
-    statusBg: "rgba(34,197,94,0.15)",
-    images: [
-      "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=200&q=80",
-      "https://images.unsplash.com/photo-1464965911861-746a04b4bca6?w=200&q=80",
-    ],
-  },
-  {
-    id: "KFD-7B0E5A12",
-    date: "29 Apr 2026 · 2 items",
-    total: 35.00,
-    status: "DELIVERED",
-    statusColor: "#15803D",
-    statusBg: "rgba(34,197,94,0.15)",
-    images: [
-      "https://images.unsplash.com/photo-1486297678162-eb2a19b0a32d?w=200&q=80",
-      "https://images.unsplash.com/photo-1488477181946-6428a0291777?w=200&q=80",
-    ],
-  },
-  {
-    id: "KFD-F2D986DA",
-    date: "21 Apr 2026 · 1 item",
-    total: 17.00,
-    status: "DELIVERED",
-    statusColor: "#15803D",
-    statusBg: "rgba(34,197,94,0.15)",
-    images: [
-      "https://images.unsplash.com/photo-1535585209827-a15fcdbc4c2d?w=200&q=80",
-    ],
-  },
-];
+const ACTIVE_STATUSES = ["pending", "confirmed", "preparing", "ready", "on_the_way", "out_for_delivery"];
+const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
+  pending:       { label: "PENDING",    color: "#94A3B8", bg: "rgba(148,163,184,0.15)" },
+  confirmed:     { label: "CONFIRMED",  color: "#1D4ED8", bg: "rgba(29,78,216,0.15)" },
+  preparing:     { label: "PREPARING",  color: "#B45309", bg: "rgba(245,158,11,0.15)" },
+  ready:         { label: "READY",      color: "#7C3AED", bg: "rgba(124,58,237,0.15)" },
+  on_the_way:    { label: "ON THE WAY", color: "#1D4ED8", bg: "rgba(29,78,216,0.15)" },
+  out_for_delivery: { label: "OUT FOR DELIVERY", color: "#1D4ED8", bg: "rgba(29,78,216,0.15)" },
+  delivered:     { label: "DELIVERED",  color: "#15803D", bg: "rgba(34,197,94,0.15)" },
+  cancelled:     { label: "CANCELLED",  color: "#DC2626", bg: "rgba(220,38,38,0.15)" },
+};
 
 export default function Orders() {
   const insets = useSafeAreaInsets();
+  const { customer, user } = useAuth();
   const [tab, setTab] = useState<"active" | "past">("active");
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!customer?.id) {
+      setOrders([]);
+      return;
+    }
+    (async () => {
+      setLoading(true);
+      const { data } = await ordersAPI.getOrders(customer.id);
+      setOrders(data);
+      setLoading(false);
+    })();
+  }, [customer?.id]);
+
+  const { active, past } = useMemo(() => {
+    return {
+      active: orders.filter((o) => ACTIVE_STATUSES.includes(o.status.toLowerCase())),
+      past: orders.filter((o) => !ACTIVE_STATUSES.includes(o.status.toLowerCase())),
+    };
+  }, [orders]);
+
+  const showSignedOut = !user;
 
   return (
     <View style={s.root}>
@@ -70,115 +55,133 @@ export default function Orders() {
         <Text style={s.subtitle}>Track and reorder anytime</Text>
 
         <View style={s.tabRow}>
-          <Pressable
-            onPress={() => setTab("active")}
-            style={[s.tab, tab === "active" && s.tabActive]}
-          >
-            <Text style={[s.tabText, tab === "active" && s.tabTextActive]}>
-              Active ({ACTIVE.length})
-            </Text>
+          <Pressable onPress={() => setTab("active")} style={[s.tab, tab === "active" && s.tabActive]}>
+            <Text style={[s.tabText, tab === "active" && s.tabTextActive]}>Active ({active.length})</Text>
           </Pressable>
-          <Pressable
-            onPress={() => setTab("past")}
-            style={[s.tab, tab === "past" && s.tabActive]}
-          >
-            <Text style={[s.tabText, tab === "past" && s.tabTextActive]}>
-              Past ({PAST.length})
-            </Text>
+          <Pressable onPress={() => setTab("past")} style={[s.tab, tab === "past" && s.tabActive]}>
+            <Text style={[s.tabText, tab === "past" && s.tabTextActive]}>Past ({past.length})</Text>
           </Pressable>
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 120 }}>
-        {tab === "active" ? (
-          ACTIVE.length === 0 ? (
-            <EmptyState
-              icon="cube-outline"
-              title="No active orders"
-              sub="Your active orders will show here"
-            />
+      {showSignedOut ? (
+        <View style={s.empty}>
+          <Ionicons name="lock-closed-outline" size={48} color="#CBD5E1" />
+          <Text style={s.emptyTitle}>Sign in to see your orders</Text>
+          <Text style={s.emptySub}>We'll keep your order history synced across devices</Text>
+          <Pressable onPress={() => router.push("/login")} style={s.emptyBtn}>
+            <Text style={s.emptyBtnText}>Sign in</Text>
+          </Pressable>
+        </View>
+      ) : loading ? (
+        <View style={s.empty}>
+          <ActivityIndicator color="#FF6B2C" size="large" />
+          <Text style={[s.emptySub, { marginTop: 16 }]}>Loading your orders…</Text>
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 120 }}>
+          {tab === "active" ? (
+            active.length === 0 ? (
+              <EmptyState icon="cube-outline" title="No active orders" sub="Your active orders will show here" />
+            ) : (
+              active.map((o) => <ActiveCard key={o.id} order={o} />)
+            )
+          ) : past.length === 0 ? (
+            <EmptyState icon="time-outline" title="No past orders yet" sub="Once you order, history will appear here" />
           ) : (
-            ACTIVE.map((o) => (
-              <Pressable
-                key={o.id}
-                onPress={() => router.push(`/order/${o.id}`)}
-                style={s.card}
-              >
-                <View style={s.cardTop}>
-                  <View>
-                    <Text style={s.cardLabel}>ORDER</Text>
-                    <Text style={s.cardId}>#{o.id}</Text>
-                    <Text style={s.cardDate}>{o.date}</Text>
-                  </View>
-                  <View style={{ alignItems: "flex-end" }}>
-                    <Text style={s.cardLabel}>Total</Text>
-                    <Text style={s.cardTotal}>AED {o.total.toFixed(2)}</Text>
-                    <View style={[s.statusPill, { backgroundColor: o.statusBg }]}>
-                      <View style={[s.liveDot, { backgroundColor: o.statusColor }]} />
-                      <Text style={[s.statusText, { color: o.statusColor }]}>{o.status}</Text>
-                    </View>
-                  </View>
-                </View>
-
-                <View style={s.imgRow}>
-                  {o.images.slice(0, 3).map((img, i) => (
-                    <Image key={i} source={{ uri: img }} style={s.imgChip} />
-                  ))}
-                  <Text style={s.itemsText}>{o.items} items</Text>
-                </View>
-
-                <View style={s.cardActions}>
-                  <View style={s.trackChip}>
-                    <Ionicons name="navigate" size={12} color="#FF6B2C" />
-                    <Text style={s.trackText}>Track order</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
-                </View>
-              </Pressable>
-            ))
-          )
-        ) : (
-          PAST.map((o) => (
-            <Pressable
-              key={o.id}
-              onPress={() => router.push(`/order/${o.id}`)}
-              style={s.pastCard}
-            >
-              <View style={s.pastImgRow}>
-                {o.images.slice(0, 3).map((img, i) => (
-                  <Image key={i} source={{ uri: img }} style={s.pastImg} />
-                ))}
-              </View>
-              <View style={{ flex: 1, justifyContent: "center" }}>
-                <Text style={s.pastId}>#{o.id}</Text>
-                <Text style={s.pastDate}>{o.date}</Text>
-                <View style={[s.statusPill, { backgroundColor: o.statusBg, alignSelf: "flex-start", marginTop: 6 }]}>
-                  <Text style={[s.statusText, { color: o.statusColor }]}>{o.status}</Text>
-                </View>
-              </View>
-              <View style={{ alignItems: "flex-end" }}>
-                <Text style={s.pastTotal}>AED {o.total.toFixed(2)}</Text>
-                <Pressable style={s.reorderBtn}>
-                  <Ionicons name="refresh" size={12} color="#FF6B2C" />
-                  <Text style={s.reorderText}>Reorder</Text>
-                </Pressable>
-              </View>
-            </Pressable>
-          ))
-        )}
-      </ScrollView>
+            past.map((o) => <PastRow key={o.id} order={o} />)
+          )}
+        </ScrollView>
+      )}
     </View>
+  );
+}
+
+function ActiveCard({ order }: { order: Order }) {
+  const meta = STATUS_LABELS[order.status.toLowerCase()] || STATUS_LABELS.confirmed;
+  const items = order.items || [];
+  const imgs = items.slice(0, 3).map((it) => it.product?.image).filter(Boolean);
+  return (
+    <Pressable onPress={() => router.push(`/order/${order.id}`)} style={s.card}>
+      <View style={s.cardTop}>
+        <View>
+          <Text style={s.cardLabel}>ORDER</Text>
+          <Text style={s.cardId}>#{order.shortId}</Text>
+          <Text style={s.cardDate}>{formatDate(order.createdAt)}</Text>
+        </View>
+        <View style={{ alignItems: "flex-end" }}>
+          <Text style={s.cardLabel}>Total</Text>
+          <Text style={s.cardTotal}>AED {order.total.toFixed(2)}</Text>
+          <View style={[s.statusPill, { backgroundColor: meta.bg }]}>
+            <View style={[s.liveDot, { backgroundColor: meta.color }]} />
+            <Text style={[s.statusText, { color: meta.color }]}>{meta.label}</Text>
+          </View>
+        </View>
+      </View>
+      <View style={s.imgRow}>
+        {imgs.map((img, i) => (
+          <Image key={i} source={{ uri: img! }} style={s.imgChip} />
+        ))}
+        <Text style={s.itemsText}>{order.itemsCount} {order.itemsCount === 1 ? "item" : "items"}</Text>
+      </View>
+      <View style={s.cardActions}>
+        <View style={s.trackChip}>
+          <Ionicons name="navigate" size={12} color="#FF6B2C" />
+          <Text style={s.trackText}>Track order</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+      </View>
+    </Pressable>
+  );
+}
+
+function PastRow({ order }: { order: Order }) {
+  const meta = STATUS_LABELS[order.status.toLowerCase()] || STATUS_LABELS.delivered;
+  const items = order.items || [];
+  const imgs = items.slice(0, 3).map((it) => it.product?.image).filter(Boolean);
+  return (
+    <Pressable onPress={() => router.push(`/order/${order.id}`)} style={s.pastCard}>
+      <View style={s.pastImgRow}>
+        {imgs.map((img, i) => (
+          <Image key={i} source={{ uri: img! }} style={s.pastImg} />
+        ))}
+      </View>
+      <View style={{ flex: 1, justifyContent: "center" }}>
+        <Text style={s.pastId}>#{order.shortId}</Text>
+        <Text style={s.pastDate}>{formatDate(order.createdAt)} · {order.itemsCount} {order.itemsCount === 1 ? "item" : "items"}</Text>
+        <View style={[s.statusPill, { backgroundColor: meta.bg, alignSelf: "flex-start", marginTop: 6 }]}>
+          <Text style={[s.statusText, { color: meta.color }]}>{meta.label}</Text>
+        </View>
+      </View>
+      <View style={{ alignItems: "flex-end" }}>
+        <Text style={s.pastTotal}>AED {order.total.toFixed(2)}</Text>
+        <Pressable style={s.reorderBtn}>
+          <Ionicons name="refresh" size={12} color="#FF6B2C" />
+          <Text style={s.reorderText}>Reorder</Text>
+        </Pressable>
+      </View>
+    </Pressable>
   );
 }
 
 function EmptyState({ icon, title, sub }: { icon: any; title: string; sub: string }) {
   return (
-    <View style={s.empty}>
-      <Ionicons name={icon} size={64} color="#CBD5E1" />
+    <View style={s.emptyMini}>
+      <Ionicons name={icon} size={56} color="#CBD5E1" />
       <Text style={s.emptyTitle}>{title}</Text>
       <Text style={s.emptySub}>{sub}</Text>
     </View>
   );
+}
+
+function formatDate(iso?: string) {
+  if (!iso) return "";
+  try {
+    const d = new Date(iso);
+    return d.toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return "";
+  }
 }
 
 const s = StyleSheet.create({
@@ -245,7 +248,13 @@ const s = StyleSheet.create({
     backgroundColor: "#FFE7D1", borderRadius: 999,
   },
   reorderText: { color: "#FF6B2C", fontSize: 11, fontWeight: "800" },
-  empty: { alignItems: "center", padding: 60 },
-  emptyTitle: { fontSize: 16, fontWeight: "800", color: "#0F172A", marginTop: 14 },
-  emptySub: { fontSize: 13, color: "#64748B", marginTop: 6, textAlign: "center" },
+  empty: { flex: 1, alignItems: "center", justifyContent: "center", padding: 40 },
+  emptyMini: { alignItems: "center", padding: 40 },
+  emptyTitle: { fontSize: 18, fontWeight: "800", color: "#0F172A", marginTop: 14 },
+  emptySub: { fontSize: 13, color: "#64748B", marginTop: 8, textAlign: "center", lineHeight: 19 },
+  emptyBtn: {
+    backgroundColor: "#FF6B2C", paddingHorizontal: 24, paddingVertical: 14,
+    borderRadius: 12, marginTop: 24,
+  },
+  emptyBtnText: { color: "white", fontSize: 14, fontWeight: "800" },
 });
