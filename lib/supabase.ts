@@ -10,6 +10,9 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     persistSession: true,
     // We handle the redirect ourselves via WebBrowser, so do not parse from URL
     detectSessionInUrl: false,
-    flowType: "pkce",
+    // Use implicit flow on mobile. PKCE loses the code_verifier when the
+    // app process gets backgrounded during the OAuth WebBrowser session,
+    // causing "PKCE code verifier not found in storage".
+    flowType: "implicit",
   },
 });

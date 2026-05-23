@@ -71,23 +71,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
 
       if (result.type === "success" && result.url) {
+        // Implicit flow: tokens come in the URL fragment (#access_token=…&refresh_token=…)
+        const fragment = result.url.split("#")[1] || "";
+        const fragParams = new URLSearchParams(fragment);
+        const access_token = fragParams.get("access_token");
+        const refresh_token = fragParams.get("refresh_token");
+
+        if (access_token && refresh_token) {
+          const { error: setErr } = await supabase.auth.setSession({ access_token, refresh_token });
+          if (setErr) throw setErr;
+          return;
+        }
+
+        // Fallback: some providers return a `code` query param (e.g. when flow auto-falls-back to PKCE)
         const url = new URL(result.url);
         const code = url.searchParams.get("code");
         if (code) {
           const { error: exErr } = await supabase.auth.exchangeCodeForSession(code);
           if (exErr) throw exErr;
-        } else {
-          // Implicit-flow fallback: tokens may be in URL fragment
-          const fragment = result.url.split("#")[1];
-          if (fragment) {
-            const params = new URLSearchParams(fragment);
-            const access_token = params.get("access_token");
-            const refresh_token = params.get("refresh_token");
-            if (access_token && refresh_token) {
-              await supabase.auth.setSession({ access_token, refresh_token });
-            }
-          }
+          return;
         }
+
+        // Surface error if neither tokens nor code came back
+        const oauthError = fragParams.get("error_description") || url.searchParams.get("error_description");
+        if (oauthError) throw new Error(oauthError);
       }
     } catch (e: any) {
       console.warn("Auth error:", e?.message || e);

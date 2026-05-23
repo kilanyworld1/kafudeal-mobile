@@ -2,7 +2,7 @@
   "expo": {
     "name": "KafuDeal",
     "slug": "kafudeal",
-    "version": "0.3.0",
+    "version": "0.4.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "kafudeal",
@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash.png",
-      "resizeMode": "cover",
+      "resizeMode": "contain",
       "backgroundColor": "#FF6B2C"
     },
     "ios": {

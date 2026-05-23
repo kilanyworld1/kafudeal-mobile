@@ -20,7 +20,7 @@ const payments = [
 
 export default function Checkout() {
   const insets = useSafeAreaInsets();
-  const { items, subtotal, clear } = useCart();
+  const { items, subtotal, clear, showToast } = useCart();
   const { customer } = useAuth();
   const [addr, setAddr] = useState("a1");
   const [pay, setPay] = useState("p1");
@@ -35,11 +35,17 @@ export default function Checkout() {
   const placeOrder = async () => {
     if (items.length === 0) return;
 
-    // Without a logged-in customer, just simulate the order locally
+    // Require sign-in to place real orders. Otherwise the order can't be saved
+    // and shown in the admin / orders list (which is the whole point).
     if (!customer?.id) {
-      const orderId = "K" + Math.floor(100000 + Math.random() * 900000).toString();
-      clear();
-      router.replace(`/order/${orderId}`);
+      Alert.alert(
+        "Sign in to place an order",
+        "We'll save your cart and let you track the order. It only takes a few seconds.",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Sign in", onPress: () => router.push("/login") },
+        ]
+      );
       return;
     }
 
@@ -63,7 +69,10 @@ export default function Checkout() {
       Alert.alert("Couldn't place order", (error as any)?.message || "Please try again.");
       return;
     }
+
+    // Success! Clear cart, show a toast, then go to tracking with the real DB id.
     clear();
+    showToast({ message: "Order confirmed!", kind: "cart" });
     router.replace(`/order/${data.id}`);
   };
 

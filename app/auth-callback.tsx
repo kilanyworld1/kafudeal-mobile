@@ -1,23 +1,33 @@
 import { useEffect } from "react";
 import { View, Text, ActivityIndicator, StyleSheet } from "react-native";
-import { useLocalSearchParams, router } from "expo-router";
+import { router } from "expo-router";
+import * as Linking from "expo-linking";
 import { supabase } from "../lib/supabase";
 
 // This route catches the deep link returned from Supabase OAuth (kafudeal://auth-callback).
-// We extract the code or token, exchange it for a session, then forward to the tabs.
+// In practice, the auth-context.tsx handler that opens WebBrowser usually finishes the
+// session-set first and this route just acts as a safety net.
 export default function AuthCallback() {
-  const params = useLocalSearchParams<{ code?: string; access_token?: string; refresh_token?: string }>();
-
   useEffect(() => {
     (async () => {
       try {
-        if (params.code) {
-          await supabase.auth.exchangeCodeForSession(String(params.code));
-        } else if (params.access_token && params.refresh_token) {
-          await supabase.auth.setSession({
-            access_token: String(params.access_token),
-            refresh_token: String(params.refresh_token),
-          });
+        const url = (await Linking.getInitialURL()) || "";
+        if (url) {
+          // Tokens come in URL fragment for implicit flow
+          const fragment = url.split("#")[1] || "";
+          const fragParams = new URLSearchParams(fragment);
+          const access_token = fragParams.get("access_token");
+          const refresh_token = fragParams.get("refresh_token");
+          if (access_token && refresh_token) {
+            await supabase.auth.setSession({ access_token, refresh_token });
+          } else {
+            // Fallback: code in query string for PKCE flow
+            const qs = url.split("?")[1]?.split("#")[0] || "";
+            const code = new URLSearchParams(qs).get("code");
+            if (code) {
+              await supabase.auth.exchangeCodeForSession(code);
+            }
+          }
         }
       } catch (e) {
         console.warn("Auth callback error", e);
@@ -25,7 +35,7 @@ export default function AuthCallback() {
         router.replace("/(tabs)");
       }
     })();
-  }, [params.code, params.access_token, params.refresh_token]);
+  }, []);
 
   return (
     <View style={s.root}>
