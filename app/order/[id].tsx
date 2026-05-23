@@ -1,33 +1,41 @@
 import { useEffect, useRef, useState } from "react";
-import { View, Text, ScrollView, Pressable, Image, StyleSheet, Animated, Easing } from "react-native";
+import { View, Text, ScrollView, Pressable, Image, StyleSheet, Animated, Easing, ActivityIndicator } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ordersAPI } from "../../lib/api";
+import { supabase } from "../../lib/supabase";
+import type { Order } from "../../lib/types";
 
 const STEPS = [
-  { emoji: "✓", label: "Confirmed" },
-  { emoji: "📦", label: "Preparing" },
-  { emoji: "🚚", label: "On the Way" },
-  { emoji: "🏠", label: "Delivered" },
+  { keys: ["pending", "confirmed"], emoji: "✓", label: "Confirmed" },
+  { keys: ["preparing", "ready"], emoji: "📦", label: "Preparing" },
+  { keys: ["on_the_way", "out_for_delivery"], emoji: "🚚", label: "On the Way" },
+  { keys: ["delivered"], emoji: "🏠", label: "Delivered" },
 ];
 
-const ITEMS = [
-  { name: "Lindt 85% Dark", qty: 1, price: 9, image: "https://images.unsplash.com/photo-1481391319762-47dff72954d9?w=200&q=80" },
-  { name: "Al Ain Milk 2L", qty: 2, price: 8, image: "https://images.unsplash.com/photo-1550583724-b2692b85b150?w=200&q=80" },
-  { name: "Nivea Cream", qty: 1, price: 15, image: "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=200&q=80" },
-];
+function statusToStepIndex(status: string): number {
+  const s = (status || "").toLowerCase();
+  for (let i = 0; i < STEPS.length; i++) {
+    if (STEPS[i].keys.includes(s)) return i;
+  }
+  return 0;
+}
 
 export default function OrderTracking() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
-  const [step, setStep] = useState(1); // 0..3
+  const [order, setOrder] = useState<Order | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const driverPulse = useRef(new Animated.Value(0)).current;
   const progressAnim = useRef(new Animated.Value(0)).current;
   const nowPulse = useRef(new Animated.Value(0)).current;
 
-  // Driver dot pulse
+  const step = order ? statusToStepIndex(order.status) : 0;
+  const cancelled = order?.status?.toLowerCase() === "cancelled";
+
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
@@ -43,38 +51,85 @@ export default function OrderTracking() {
     ).start();
   }, []);
 
-  // Progress bar
   useEffect(() => {
     Animated.timing(progressAnim, {
       toValue: step / (STEPS.length - 1),
-      duration: 700, easing: Easing.out(Easing.cubic), useNativeDriver: false,
+      duration: 600, easing: Easing.out(Easing.cubic), useNativeDriver: false,
     }).start();
   }, [step]);
 
-  // Auto-advance demo
+  // Initial fetch + realtime subscription on this order
   useEffect(() => {
-    if (step >= STEPS.length - 1) return;
-    const t = setTimeout(() => setStep((s) => Math.min(STEPS.length - 1, s + 1)), 7500);
-    return () => clearTimeout(t);
-  }, [step]);
+    if (!id) return;
+    let abort = false;
+
+    const load = async () => {
+      const { data } = await ordersAPI.getOrder(String(id));
+      if (!abort) {
+        setOrder(data);
+        setLoading(false);
+      }
+    };
+    load();
+
+    const channel = supabase
+      .channel(`order-${id}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "orders", filter: `id=eq.${id}` },
+        () => load()
+      )
+      .subscribe();
+
+    return () => {
+      abort = true;
+      supabase.removeChannel(channel);
+    };
+  }, [id]);
 
   const progressW = progressAnim.interpolate({ inputRange: [0, 1], outputRange: ["0%", "100%"] });
   const driverScale = driverPulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.15] });
   const nowScale = nowPulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.6] });
   const nowOpacity = nowPulse.interpolate({ inputRange: [0, 1], outputRange: [0.5, 0] });
 
-  const stageText =
-    step === 0 ? "Order confirmed" :
-    step === 1 ? "Preparing your order" :
-    step === 2 ? "On the way to you" :
-    "Order delivered";
-  const stageSub =
-    step === 0 ? "Sent to the store" :
-    step === 1 ? "Estimated arrival 30–45 min" :
-    step === 2 ? "Arriving in ~10 min" :
-    "Hope you enjoyed!";
-  const stageEmoji =
-    step === 0 ? "✅" : step === 1 ? "📦" : step === 2 ? "🚚" : "🎉";
+  if (loading) {
+    return (
+      <View style={s.loading}>
+        <ActivityIndicator color="#FF6B2C" size="large" />
+        <Text style={{ color: "#64748B", marginTop: 14 }}>Loading order…</Text>
+      </View>
+    );
+  }
+
+  if (!order) {
+    return (
+      <View style={s.loading}>
+        <Ionicons name="alert-circle-outline" size={48} color="#94A3B8" />
+        <Text style={{ color: "#0F172A", fontSize: 16, marginTop: 12, fontWeight: "800" }}>
+          Order not found
+        </Text>
+        <Pressable onPress={() => router.replace("/(tabs)/orders")} style={s.backCta}>
+          <Text style={s.backCtaText}>Back to orders</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  const stageEmoji = cancelled ? "❌" : step === 0 ? "✅" : step === 1 ? "📦" : step === 2 ? "🚚" : "🎉";
+  const stageTitle = cancelled
+    ? "Order cancelled"
+    : step === 0 ? "Order confirmed"
+    : step === 1 ? "Preparing your order"
+    : step === 2 ? "On the way to you"
+    : "Order delivered";
+  const stageSub = cancelled
+    ? "If you didn't ask for this, contact support"
+    : step === 0 ? "Sent to the store"
+    : step === 1 ? "Estimated arrival 30–45 min"
+    : step === 2 ? "Arriving in ~10 min"
+    : "Hope you enjoyed!";
+
+  const items = order.items || [];
 
   return (
     <View style={s.root}>
@@ -83,167 +138,155 @@ export default function OrderTracking() {
           <Ionicons name="chevron-back" size={22} color="#0F172A" />
         </Pressable>
         <View style={{ flex: 1, marginLeft: 8 }}>
-          <Text style={s.topId}>#{id}</Text>
-          <Text style={s.topSub}>Placed 14:23 · 3 items</Text>
+          <Text style={s.topId}>#{order.shortId}</Text>
+          <Text style={s.topSub}>
+            Placed {formatTime(order.createdAt)} · {order.itemsCount} {order.itemsCount === 1 ? "item" : "items"}
+          </Text>
         </View>
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
-        {/* Stage card */}
-        <View style={s.stageCard}>
+        <View style={[s.stageCard, cancelled && { backgroundColor: "#FEE2E2", borderColor: "rgba(220,38,38,0.20)" }]}>
           <Text style={{ fontSize: 40 }}>{stageEmoji}</Text>
           <View style={{ flex: 1 }}>
-            <Text style={s.stageTitle}>{stageText}</Text>
-            <Text style={s.stageSub}>{stageSub}</Text>
+            <Text style={[s.stageTitle, cancelled && { color: "#991B1B" }]}>{stageTitle}</Text>
+            <Text style={[s.stageSub, cancelled && { color: "#7F1D1D" }]}>{stageSub}</Text>
           </View>
         </View>
 
-        {/* Tracker */}
-        <View style={s.tracker}>
-          <View style={s.lineBg} />
-          <Animated.View style={[s.lineFill, { width: progressW }]} />
-          <View style={s.stepsRow}>
-            {STEPS.map((st, i) => {
-              const done = i < step;
-              const now = i === step;
-              const pending = i > step;
-              return (
-                <View key={i} style={s.stepCol}>
-                  <View style={[
-                    s.dot,
-                    done && s.dotDone,
-                    now && s.dotNow,
-                  ]}>
-                    {now && (
-                      <Animated.View
-                        style={[
-                          s.nowHalo,
-                          { transform: [{ scale: nowScale }], opacity: nowOpacity },
-                        ]}
-                      />
-                    )}
-                    <Text style={[
-                      s.dotEmoji,
-                      pending && { opacity: 0.4 },
-                    ]}>
-                      {done ? "✓" : st.emoji}
+        {!cancelled && (
+          <View style={s.tracker}>
+            <View style={s.lineBg} />
+            <Animated.View style={[s.lineFill, { width: progressW }]} />
+            <View style={s.stepsRow}>
+              {STEPS.map((st, i) => {
+                const done = i < step;
+                const now = i === step;
+                const pending = i > step;
+                return (
+                  <View key={i} style={s.stepCol}>
+                    <View style={[s.dot, done && s.dotDone, now && s.dotNow]}>
+                      {now && (
+                        <Animated.View
+                          style={[
+                            s.nowHalo,
+                            { transform: [{ scale: nowScale }], opacity: nowOpacity },
+                          ]}
+                        />
+                      )}
+                      <Text style={[s.dotEmoji, pending && { opacity: 0.4 }]}>
+                        {done ? "✓" : st.emoji}
+                      </Text>
+                    </View>
+                    <Text style={[s.stepLabel, !pending && s.stepLabelActive]}>
+                      {st.label}
                     </Text>
                   </View>
-                  <Text style={[s.stepLabel, !pending && s.stepLabelActive]}>
-                    {st.label}
-                  </Text>
-                </View>
-              );
-            })}
+                );
+              })}
+            </View>
           </View>
-        </View>
+        )}
 
-        {/* Map mock */}
-        <View style={s.mapBox}>
-          {/* Grid pattern background */}
-          <View style={s.mapGrid}>
-            {[...Array(6)].map((_, r) => (
-              <View key={r} style={s.mapRow}>
-                {[...Array(6)].map((_, c) => (
-                  <View key={c} style={s.mapCell} />
+        {step >= 2 && !cancelled && (
+          <>
+            <View style={s.mapBox}>
+              <View style={s.mapGrid}>
+                {[...Array(6)].map((_, r) => (
+                  <View key={r} style={s.mapRow}>
+                    {[...Array(6)].map((_, c) => (
+                      <View key={c} style={s.mapCell} />
+                    ))}
+                  </View>
                 ))}
               </View>
-            ))}
-          </View>
-
-          {/* Route */}
-          <Svg style={StyleSheet.absoluteFill} viewBox="0 0 400 220" preserveAspectRatio="none">
-            <Path
-              d="M 110 145 Q 150 90 230 110 Q 290 130 320 70"
-              fill="none"
-              stroke="rgba(255,107,44,0.6)"
-              strokeWidth={3}
-              strokeDasharray="6 5"
-              strokeLinecap="round"
-            />
-          </Svg>
-
-          {/* Destination pin */}
-          <View style={[s.pin, { right: "16%", top: "10%" }]}>
-            <View style={s.pinHead}>
-              <Ionicons name="location" size={16} color="white" />
-            </View>
-          </View>
-
-          {/* Driver dot animated */}
-          <Animated.View
-            style={[
-              s.driverDot,
-              { left: "27%", top: "60%", transform: [{ scale: driverScale }] },
-            ]}
-          >
-            <Text style={{ fontSize: 16 }}>🚚</Text>
-          </Animated.View>
-
-          {/* Distance chip */}
-          <View style={s.distChip}>
-            <Ionicons name="navigate" size={12} color="#FF6B2C" />
-            <Text style={s.distChipText}>1.2 km away</Text>
-          </View>
-        </View>
-
-        {/* Driver card */}
-        <View style={s.driverCard}>
-          <View style={s.driverAvatar}>
-            <Text style={s.driverInitial}>A</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={s.driverName}>Ahmed M. · Your driver</Text>
-            <View style={s.starRow}>
-              <Ionicons name="star" size={11} color="#F59E0B" />
-              <Text style={s.driverMeta}>4.9 · Honda CB · F-7421</Text>
-            </View>
-          </View>
-          <Pressable style={[s.iconCircle, { backgroundColor: "#ECFDF5" }]}>
-            <Ionicons name="call" size={16} color="#15803D" />
-          </Pressable>
-          <Pressable style={[s.iconCircle, { backgroundColor: "#FFF1E5", marginLeft: 6 }]}>
-            <Ionicons name="chatbubble" size={16} color="#FF6B2C" />
-          </Pressable>
-        </View>
-
-        {/* Chat with KafuDeal */}
-        <Pressable style={s.chatCard}>
-          <View style={s.chatIcon}>
-            <Ionicons name="chatbubble-ellipses" size={20} color="#FF6B2C" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={s.chatTitle}>Chat with KafuDeal</Text>
-            <Text style={s.chatSub}>Available while your order is in progress</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color="#FF6B2C" />
-        </Pressable>
-
-        {/* Items */}
-        <Text style={s.sectionTitle}>Items</Text>
-        <View style={s.itemsCard}>
-          {ITEMS.map((it, i) => (
-            <View key={i} style={[s.itemRow, i < ITEMS.length - 1 && s.itemRowBorder]}>
-              <Image source={{ uri: it.image }} style={s.itemImg} />
-              <View style={{ flex: 1 }}>
-                <Text style={s.itemName}>{it.name}</Text>
-                <Text style={s.itemMeta}>× {it.qty} · AED {it.price} each</Text>
+              <Svg style={StyleSheet.absoluteFill} viewBox="0 0 400 220" preserveAspectRatio="none">
+                <Path
+                  d="M 110 145 Q 150 90 230 110 Q 290 130 320 70"
+                  fill="none"
+                  stroke="rgba(255,107,44,0.6)"
+                  strokeWidth={3}
+                  strokeDasharray="6 5"
+                  strokeLinecap="round"
+                />
+              </Svg>
+              <View style={[s.pin, { right: "16%", top: "10%" }]}>
+                <View style={s.pinHead}>
+                  <Ionicons name="location" size={16} color="white" />
+                </View>
               </View>
-              <Text style={s.itemTotal}>AED {it.price * it.qty}</Text>
+              <Animated.View
+                style={[s.driverDot, { left: "27%", top: "60%", transform: [{ scale: driverScale }] }]}
+              >
+                <Text style={{ fontSize: 16 }}>🚚</Text>
+              </Animated.View>
+              <View style={s.distChip}>
+                <Ionicons name="navigate" size={12} color="#FF6B2C" />
+                <Text style={s.distChipText}>1.2 km away</Text>
+              </View>
             </View>
-          ))}
-        </View>
 
-        {/* Totals */}
+            <View style={s.driverCard}>
+              <View style={s.driverAvatar}><Text style={s.driverInitial}>A</Text></View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.driverName}>Ahmed M. · Your driver</Text>
+                <View style={s.starRow}>
+                  <Ionicons name="star" size={11} color="#F59E0B" />
+                  <Text style={s.driverMeta}>4.9 · Honda CB · F-7421</Text>
+                </View>
+              </View>
+              <Pressable style={[s.iconCircle, { backgroundColor: "#ECFDF5" }]}>
+                <Ionicons name="call" size={16} color="#15803D" />
+              </Pressable>
+              <Pressable style={[s.iconCircle, { backgroundColor: "#FFF1E5", marginLeft: 6 }]}>
+                <Ionicons name="chatbubble" size={16} color="#FF6B2C" />
+              </Pressable>
+            </View>
+          </>
+        )}
+
+        {!cancelled && (
+          <Pressable style={s.chatCard}>
+            <View style={s.chatIcon}>
+              <Ionicons name="chatbubble-ellipses" size={20} color="#FF6B2C" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.chatTitle}>Chat with KafuDeal</Text>
+              <Text style={s.chatSub}>Available while your order is in progress</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#FF6B2C" />
+          </Pressable>
+        )}
+
+        {items.length > 0 && (
+          <>
+            <Text style={s.sectionTitle}>Items</Text>
+            <View style={s.itemsCard}>
+              {items.map((it, i) => (
+                <View key={i} style={[s.itemRow, i < items.length - 1 && s.itemRowBorder]}>
+                  {it.product?.image ? (
+                    <Image source={{ uri: it.product.image }} style={s.itemImg} />
+                  ) : (
+                    <View style={s.itemImg} />
+                  )}
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.itemName}>{it.product?.name || "Item"}</Text>
+                    <Text style={s.itemMeta}>× {it.qty} · AED {it.price} each</Text>
+                  </View>
+                  <Text style={s.itemTotal}>AED {(it.price * it.qty).toFixed(2)}</Text>
+                </View>
+              ))}
+            </View>
+          </>
+        )}
+
         <View style={s.totalsCard}>
-          <Row label="Subtotal" value="AED 56" />
-          <Row label="Voucher (WELCOME10)" value="−AED 5.60" valueColor="#15803D" labelColor="#15803D" />
-          <Row label="Delivery" value="AED 12" />
-          <View style={s.divider} />
-          <Row label="Total paid" value="AED 62.40" big />
+          <View style={s.totalsRow}>
+            <Text style={s.totalsLblBig}>Total</Text>
+            <Text style={s.totalsValBig}>AED {order.total.toFixed(2)}</Text>
+          </View>
         </View>
 
-        {/* Help button */}
         <Pressable style={s.helpBtn}>
           <Ionicons name="help-circle-outline" size={18} color="#FF6B2C" />
           <Text style={s.helpBtnText}>Need help with this order?</Text>
@@ -253,26 +296,21 @@ export default function OrderTracking() {
   );
 }
 
-function Row({
-  label, value, big, valueColor, labelColor,
-}: {
-  label: string; value: string; big?: boolean;
-  valueColor?: string; labelColor?: string;
-}) {
-  return (
-    <View style={s.totalsRow}>
-      <Text style={[s.totalsLbl, big && s.totalsLblBig, labelColor && { color: labelColor }]}>
-        {label}
-      </Text>
-      <Text style={[s.totalsVal, big && s.totalsValBig, valueColor && { color: valueColor }]}>
-        {value}
-      </Text>
-    </View>
-  );
+function formatTime(iso?: string) {
+  if (!iso) return "";
+  try {
+    return new Date(iso).toLocaleString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  } catch { return ""; }
 }
 
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#FFF9F2" },
+  loading: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#FFF9F2", padding: 40 },
+  backCta: {
+    marginTop: 18, backgroundColor: "#FF6B2C",
+    paddingHorizontal: 22, paddingVertical: 12, borderRadius: 10,
+  },
+  backCtaText: { color: "white", fontWeight: "800" },
   topBar: {
     flexDirection: "row", alignItems: "center",
     paddingHorizontal: 12, paddingBottom: 12,
@@ -282,7 +320,6 @@ const s = StyleSheet.create({
   backBtn: { padding: 6 },
   topId: { fontFamily: "Menlo", fontSize: 16, fontWeight: "800", color: "#0F172A" },
   topSub: { fontSize: 11.5, color: "#64748B", marginTop: 2 },
-
   stageCard: {
     flexDirection: "row", alignItems: "center", gap: 14,
     padding: 18, borderRadius: 16,
@@ -291,7 +328,6 @@ const s = StyleSheet.create({
   },
   stageTitle: { fontSize: 16, fontWeight: "800", color: "#C2410C" },
   stageSub: { fontSize: 12, color: "#9A3412", marginTop: 3 },
-
   tracker: { marginTop: 22, marginHorizontal: 4, position: "relative", height: 80, justifyContent: "center" },
   lineBg: {
     position: "absolute", top: 22, left: 20, right: 20,
@@ -318,7 +354,6 @@ const s = StyleSheet.create({
   },
   stepLabel: { fontSize: 10.5, color: "#94A3B8", fontWeight: "700", marginTop: 6, textAlign: "center" },
   stepLabelActive: { color: "#0F172A" },
-
   mapBox: {
     height: 200, borderRadius: 16, marginTop: 18,
     backgroundColor: "#E8F0F8",
@@ -354,7 +389,6 @@ const s = StyleSheet.create({
     shadowColor: "#0F172A", shadowOpacity: 0.12, shadowRadius: 8, elevation: 4,
   },
   distChipText: { fontSize: 11, fontWeight: "800", color: "#0F172A" },
-
   driverCard: {
     flexDirection: "row", alignItems: "center",
     backgroundColor: "white", borderRadius: 14, padding: 14, marginTop: 14,
@@ -374,7 +408,6 @@ const s = StyleSheet.create({
     width: 38, height: 38, borderRadius: 19,
     alignItems: "center", justifyContent: "center",
   },
-
   chatCard: {
     flexDirection: "row", alignItems: "center", gap: 12,
     backgroundColor: "white", borderRadius: 14, padding: 14, marginTop: 12,
@@ -387,7 +420,6 @@ const s = StyleSheet.create({
   },
   chatTitle: { fontSize: 14, fontWeight: "800", color: "#0F172A" },
   chatSub: { fontSize: 11.5, color: "#64748B", marginTop: 2 },
-
   sectionTitle: { fontSize: 14, fontWeight: "800", color: "#0F172A", marginTop: 22, marginBottom: 10 },
   itemsCard: { backgroundColor: "white", borderRadius: 14, paddingHorizontal: 14 },
   itemRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12 },
@@ -396,15 +428,10 @@ const s = StyleSheet.create({
   itemName: { fontSize: 13.5, fontWeight: "800", color: "#0F172A" },
   itemMeta: { fontSize: 11.5, color: "#64748B", marginTop: 2 },
   itemTotal: { fontSize: 14, fontWeight: "800", color: "#FF6B2C" },
-
   totalsCard: { backgroundColor: "white", borderRadius: 14, padding: 16, marginTop: 14 },
   totalsRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 4 },
-  totalsLbl: { fontSize: 13, color: "#64748B" },
   totalsLblBig: { fontSize: 15, fontWeight: "800", color: "#0F172A" },
-  totalsVal: { fontSize: 13, fontWeight: "700", color: "#0F172A" },
   totalsValBig: { fontSize: 20, fontWeight: "800", color: "#FF6B2C" },
-  divider: { height: 1, backgroundColor: "rgba(15,23,42,0.06)", marginVertical: 8 },
-
   helpBtn: {
     flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
     paddingVertical: 14, marginTop: 18,

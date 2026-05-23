@@ -1,8 +1,8 @@
-import { useEffect, useState, useMemo } from "react";
-import { View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator } from "react-native";
+import { useEffect, useState, useMemo, useCallback } from "react";
+import { View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator, RefreshControl } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { productsAPI, categoriesAPI } from "../../lib/api";
 import type { Product, Category } from "../../lib/types";
 import ProductCard from "../../components/ProductCard";
@@ -13,19 +13,32 @@ export default function Deals() {
   const [products, setProducts] = useState<Product[]>([]);
   const [cats, setCats] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchAll = useCallback(async () => {
+    const [{ data: prods }, { data: c }] = await Promise.all([
+      productsAPI.getProducts({ from: 0, to: 200, excludeExpired: true }),
+      categoriesAPI.getCategories(),
+    ]);
+    setProducts(prods);
+    setCats(c);
+  }, []);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const [{ data: prods }, { data: c }] = await Promise.all([
-        productsAPI.getProducts({ from: 0, to: 200, excludeExpired: true }),
-        categoriesAPI.getCategories(),
-      ]);
-      setProducts(prods);
-      setCats(c);
+      await fetchAll();
       setLoading(false);
     })();
-  }, []);
+  }, [fetchAll]);
+
+  useFocusEffect(useCallback(() => { fetchAll(); }, [fetchAll]));
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchAll();
+    setRefreshing(false);
+  }, [fetchAll]);
 
   const filters = useMemo(() => {
     const dynamicCats = cats.slice(0, 6).map((c) => c.name);
@@ -77,7 +90,12 @@ export default function Deals() {
           <Text style={s.loadingText}>Loading deals…</Text>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
+        <ScrollView
+          contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FF6B2C" />
+          }
+        >
           <Text style={s.resultsCount}>{filtered.length} results</Text>
           <View style={s.grid}>
             {filtered.map((p) => (

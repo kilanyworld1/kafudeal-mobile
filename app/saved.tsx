@@ -1,8 +1,8 @@
-import { useEffect, useState, useMemo } from "react";
-import { View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator } from "react-native";
+import { useEffect, useState, useMemo, useCallback } from "react";
+import { View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator, RefreshControl } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { productsAPI } from "../lib/api";
 import type { Product } from "../lib/types";
 import { useCart } from "../lib/cart-context";
@@ -13,15 +13,28 @@ export default function Saved() {
   const { saved } = useCart();
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchAll = useCallback(async () => {
+    const { data } = await productsAPI.getProducts({ from: 0, to: 200 });
+    setAllProducts(data);
+  }, []);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const { data } = await productsAPI.getProducts({ from: 0, to: 200 });
-      setAllProducts(data);
+      await fetchAll();
       setLoading(false);
     })();
-  }, []);
+  }, [fetchAll]);
+
+  useFocusEffect(useCallback(() => { fetchAll(); }, [fetchAll]));
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchAll();
+    setRefreshing(false);
+  }, [fetchAll]);
 
   const items = useMemo(
     () => allProducts.filter((p) => saved.includes(p.id)),
@@ -53,7 +66,12 @@ export default function Saved() {
           </Pressable>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
+        <ScrollView
+          contentContainerStyle={{ padding: 16, paddingBottom: 60 }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FF6B2C" />
+          }
+        >
           <Text style={s.subtitle}>
             {items.length} item{items.length === 1 ? "" : "s"} saved
             {items.filter((p) => p.urgent).length > 0 &&

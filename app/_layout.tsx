@@ -26,6 +26,7 @@ export default function RootLayout() {
           <Stack.Screen name="vouchers" />
           <Stack.Screen name="settings" />
           <Stack.Screen name="help" />
+          <Stack.Screen name="auth-callback" options={{ animation: "fade" }} />
         </Stack>
         </CartProvider>
       </AuthProvider>

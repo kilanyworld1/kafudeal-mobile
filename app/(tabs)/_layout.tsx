@@ -1,7 +1,8 @@
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { View, Text, Animated } from "react-native";
+import { View, Text, Animated, Image } from "react-native";
 import { useCart } from "../../lib/cart-context";
+import { useAuth } from "../../lib/auth-context";
 
 function CartTabIcon({ color }: { color: string }) {
   const { count, badgeScale } = useCart();
@@ -29,6 +30,29 @@ function CartTabIcon({ color }: { color: string }) {
       )}
     </View>
   );
+}
+
+function AccountTabIcon({ color, focused }: { color: string; focused: boolean }) {
+  const { user } = useAuth();
+  const avatarUrl =
+    (user?.user_metadata?.avatar_url as string) ||
+    (user?.user_metadata?.picture as string) ||
+    "";
+
+  if (avatarUrl) {
+    return (
+      <View
+        style={{
+          width: 26, height: 26, borderRadius: 13,
+          borderWidth: 2, borderColor: focused ? "#FF6B2C" : "transparent",
+          overflow: "hidden",
+        }}
+      >
+        <Image source={{ uri: avatarUrl }} style={{ width: "100%", height: "100%" }} />
+      </View>
+    );
+  }
+  return <Ionicons name="person-circle-outline" size={24} color={color} />;
 }
 
 export default function TabsLayout() {
@@ -81,7 +105,7 @@ export default function TabsLayout() {
         name="account"
         options={{
           title: "Account",
-          tabBarIcon: ({ color }) => <Ionicons name="person-circle-outline" size={22} color={color} />,
+          tabBarIcon: ({ color, focused }) => <AccountTabIcon color={color} focused={focused} />,
         }}
       />
     </Tabs>

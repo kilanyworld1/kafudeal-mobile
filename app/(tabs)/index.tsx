@@ -1,12 +1,12 @@
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import {
   View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator,
-  Animated, Image,
+  Animated, Image, RefreshControl,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { productsAPI, categoriesAPI } from "../../lib/api";
 import type { Product, Category } from "../../lib/types";
 import { useAuth } from "../../lib/auth-context";
@@ -57,19 +57,38 @@ export default function Home() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Fetch live
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchAll = useCallback(async () => {
+    const [{ data: prods }, { data: cats }] = await Promise.all([
+      productsAPI.getProducts({ from: 0, to: 60, excludeExpired: true }),
+      categoriesAPI.getCategories(),
+    ]);
+    setProducts(prods);
+    setLiveCategories(cats);
+  }, []);
+
+  // Initial fetch
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const [{ data: prods }, { data: cats }] = await Promise.all([
-        productsAPI.getProducts({ from: 0, to: 60, excludeExpired: true }),
-        categoriesAPI.getCategories(),
-      ]);
-      setProducts(prods);
-      setLiveCategories(cats);
+      await fetchAll();
       setLoading(false);
     })();
-  }, []);
+  }, [fetchAll]);
+
+  // Refetch every time the user navigates back to this tab
+  useFocusEffect(
+    useCallback(() => {
+      fetchAll();
+    }, [fetchAll])
+  );
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchAll();
+    setRefreshing(false);
+  }, [fetchAll]);
 
   // Filter by selected category
   const filteredProducts = useMemo(() => {
@@ -135,10 +154,10 @@ export default function Home() {
         ]}
       >
         <View style={s.stickyTopRow}>
-          <View style={s.stickyLoc}>
+          <Pressable onPress={() => router.push("/addresses")} style={s.stickyLoc}>
             <Ionicons name="location-sharp" size={14} color="#FF6B2C" />
             <Text style={s.stickyLocText}>Dubai Marina · JLT</Text>
-          </View>
+          </Pressable>
           <View style={{ flexDirection: "row", gap: 6 }}>
             <Pressable onPress={() => router.push("/saved")} style={s.stickyIconBtn}>
               <Ionicons name="heart-outline" size={18} color="#0F172A" />
@@ -147,11 +166,6 @@ export default function Home() {
               <Ionicons name="notifications-outline" size={18} color="#0F172A" />
               <View style={s.stickyDot} />
             </Pressable>
-            {avatarUrl ? (
-              <Pressable onPress={() => router.push("/(tabs)/account")}>
-                <Image source={{ uri: avatarUrl }} style={s.stickyAvatar} />
-              </Pressable>
-            ) : null}
           </View>
         </View>
 
@@ -182,6 +196,9 @@ export default function Home() {
         contentContainerStyle={{ paddingBottom: 30 }}
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FF6B2C" />
+        }
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
           { useNativeDriver: true }
@@ -195,7 +212,7 @@ export default function Home() {
           style={[s.banner, { paddingTop: insets.top + 16 }]}
         >
           <View style={s.topRow}>
-            <Pressable style={{ flex: 1 }}>
+            <Pressable onPress={() => router.push("/addresses")} style={{ flex: 1 }}>
               <Text style={s.eyebrow}>DELIVER TO</Text>
               <View style={s.locationRow}>
                 <Ionicons name="location-sharp" size={14} color="white" />
@@ -212,11 +229,6 @@ export default function Home() {
                 <Ionicons name="notifications-outline" size={18} color="white" />
                 <View style={s.iconDot} />
               </Pressable>
-              {avatarUrl ? (
-                <Pressable onPress={() => router.push("/(tabs)/account")}>
-                  <Image source={{ uri: avatarUrl }} style={s.headerAvatar} />
-                </Pressable>
-              ) : null}
             </View>
           </View>
 

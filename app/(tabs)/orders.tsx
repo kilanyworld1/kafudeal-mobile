@@ -1,9 +1,10 @@
-import { useEffect, useState, useMemo } from "react";
-import { View, Text, ScrollView, Pressable, Image, StyleSheet, ActivityIndicator } from "react-native";
+import { useEffect, useState, useMemo, useCallback } from "react";
+import { View, Text, ScrollView, Pressable, Image, StyleSheet, ActivityIndicator, RefreshControl } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { ordersAPI } from "../../lib/api";
+import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../lib/auth-context";
 import type { Order } from "../../lib/types";
 
@@ -26,18 +27,46 @@ export default function Orders() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchOrders = useCallback(async () => {
     if (!customer?.id) {
       setOrders([]);
       return;
     }
+    const { data } = await ordersAPI.getOrders(customer.id);
+    setOrders(data);
+  }, [customer?.id]);
+
+  useEffect(() => {
     (async () => {
       setLoading(true);
-      const { data } = await ordersAPI.getOrders(customer.id);
-      setOrders(data);
+      await fetchOrders();
       setLoading(false);
     })();
-  }, [customer?.id]);
+  }, [fetchOrders]);
+
+  useFocusEffect(useCallback(() => { fetchOrders(); }, [fetchOrders]));
+
+  // Realtime: refetch when ANY of this customer's orders change
+  useEffect(() => {
+    if (!customer?.id) return;
+    const channel = supabase
+      .channel(`orders-${customer.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "orders", filter: `customer_id=eq.${customer.id}` },
+        () => fetchOrders()
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [customer?.id, fetchOrders]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchOrders();
+    setRefreshing(false);
+  }, [fetchOrders]);
 
   const { active, past } = useMemo(() => {
     return {
@@ -79,7 +108,12 @@ export default function Orders() {
           <Text style={[s.emptySub, { marginTop: 16 }]}>Loading your orders…</Text>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 120 }}>
+        <ScrollView
+          contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FF6B2C" />
+          }
+        >
           {tab === "active" ? (
             active.length === 0 ? (
               <EmptyState icon="cube-outline" title="No active orders" sub="Your active orders will show here" />
