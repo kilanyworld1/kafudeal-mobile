@@ -166,59 +166,77 @@ export const contentAPI = {
 
 // ─── AUTH / CUSTOMER ────────────────────────────────────────────────────────
 
+// Map a raw customers row (any shape) → app Customer type.
+// Be defensive about column names since the real schema only has: id, auth_user_id, email, name, created_at.
+function toCustomer(row: any): Customer | null {
+  if (!row) return null;
+  return {
+    id: row.id,
+    authUserId: row.auth_user_id,
+    fullName: row.name || row.full_name || "",
+    email: row.email,
+    phone: row.phone || "",
+    countryCode: row.country_code || "",
+  };
+}
+
 export const authAPI = {
   async getOrCreateCustomer(authUserId: string, fallbackEmail?: string, fallbackName?: string): Promise<Customer | null> {
-    // Try to find an existing customer
-    const { data: existing } = await supabase
+    // 1) Try by auth_user_id
+    const byAuth = await supabase
       .from("customers")
-      .select("id, auth_user_id, full_name, email, phone, country_code")
+      .select("*")
       .eq("auth_user_id", authUserId)
       .maybeSingle();
+    if (byAuth.data) return toCustomer(byAuth.data);
 
-    if (existing) {
-      return {
-        id: existing.id,
-        authUserId: existing.auth_user_id,
-        fullName: existing.full_name,
-        email: existing.email,
-        phone: existing.phone,
-        countryCode: existing.country_code,
-      };
+    // 2) Maybe an older customer row exists with the same email but no auth_user_id link.
+    //    Adopt it by setting its auth_user_id, so future logins find it.
+    if (fallbackEmail) {
+      const byEmail = await supabase
+        .from("customers")
+        .select("*")
+        .eq("email", fallbackEmail)
+        .maybeSingle();
+      if (byEmail.data) {
+        // If it's already linked to another user, just return it (don't clobber).
+        // Otherwise, link this auth user to it.
+        if (!byEmail.data.auth_user_id) {
+          const linked = await supabase
+            .from("customers")
+            .update({ auth_user_id: authUserId })
+            .eq("id", byEmail.data.id)
+            .select()
+            .maybeSingle();
+          if (linked.data) return toCustomer(linked.data);
+        }
+        return toCustomer(byEmail.data);
+      }
     }
 
-    // Create a new one
-    const { data: created, error } = await supabase
+    // 3) Create new (using actual column name `name`, not `full_name`)
+    const { data: created } = await supabase
       .from("customers")
       .insert({
         auth_user_id: authUserId,
         email: fallbackEmail,
-        full_name: fallbackName,
+        name: fallbackName,
       })
       .select()
-      .single();
-
-    if (error || !created) return null;
-    return {
-      id: created.id,
-      authUserId: created.auth_user_id,
-      fullName: created.full_name,
-      email: created.email,
-      phone: created.phone,
-      countryCode: created.country_code,
-    };
+      .maybeSingle();
+    return toCustomer(created);
   },
 
   async updateCustomer(customerId: string, patch: Partial<Customer>) {
     const { data, error } = await supabase
       .from("customers")
       .update({
-        full_name: patch.fullName,
-        phone: patch.phone,
-        country_code: patch.countryCode,
+        name: patch.fullName,
+        // phone / country_code intentionally omitted (columns may not exist)
       })
       .eq("id", customerId)
       .select()
-      .single();
+      .maybeSingle();
     return { data, error };
   },
 };
@@ -266,12 +284,20 @@ export const cartAPI = {
 // ─── ORDERS ─────────────────────────────────────────────────────────────────
 
 export const ordersAPI = {
-  async getOrders(customerId: string): Promise<{ data: Order[]; error: any }> {
-    const { data, error } = await supabase
+  // Match the web behavior: find orders by customer_id OR snapshot email,
+  // and order by updated_at (the actual timestamp column on this table).
+  async getOrders(customerId: string, customerEmail?: string): Promise<{ data: Order[]; error: any }> {
+    let q = supabase
       .from("orders")
-      .select("*, order_items(*, products(*, partners(name)))")
-      .eq("customer_id", customerId)
-      .order("created_at", { ascending: false });
+      .select("*, order_items(*, products(*, partners(name)))");
+
+    if (customerEmail) {
+      q = q.or(`customer_id.eq.${customerId},customer_email.eq.${customerEmail}`);
+    } else {
+      q = q.eq("customer_id", customerId);
+    }
+
+    const { data, error } = await q.order("updated_at", { ascending: false });
     return { data: (data || []).map(transformOrder), error };
   },
 
@@ -286,27 +312,36 @@ export const ordersAPI = {
 
   async createOrder(payload: {
     customer_id: string;
+    customer_name?: string;
+    customer_email?: string;
+    customer_phone?: string;
     subtotal: number;
     delivery_fee: number;
     total: number;
-    address_id?: string;
     payment_method?: string;
     voucher_code?: string;
     items: { product_id: string; quantity: number; price: number }[];
   }) {
-    // Insert order
+    // Insert order. Stick to a minimal set of columns that we know exist on the
+    // orders table (id, customer_id, customer_name, customer_email, customer_phone,
+    // total, order_status, updated_at). Extra fields are best-effort.
+    const insertRow: Record<string, any> = {
+      customer_id: payload.customer_id,
+      customer_name: payload.customer_name,
+      customer_email: payload.customer_email,
+      customer_phone: payload.customer_phone,
+      total: payload.total,
+      order_status: "confirmed",
+    };
+    // optional columns — Supabase silently ignores undefined values
+    if (payload.subtotal != null) insertRow.subtotal = payload.subtotal;
+    if (payload.delivery_fee != null) insertRow.delivery_fee = payload.delivery_fee;
+    if (payload.payment_method) insertRow.payment_method = payload.payment_method;
+    if (payload.voucher_code) insertRow.voucher_code = payload.voucher_code;
+
     const { data: order, error: orderErr } = await supabase
       .from("orders")
-      .insert({
-        customer_id: payload.customer_id,
-        subtotal: payload.subtotal,
-        delivery_fee: payload.delivery_fee,
-        total: payload.total,
-        address_id: payload.address_id,
-        payment_method: payload.payment_method,
-        voucher_code: payload.voucher_code,
-        order_status: "confirmed",
-      })
+      .insert(insertRow)
       .select()
       .single();
     if (orderErr || !order) return { data: null, error: orderErr };

@@ -34,9 +34,10 @@ export default function Orders() {
       setOrders([]);
       return;
     }
-    const { data } = await ordersAPI.getOrders(customer.id);
+    // Match by customer_id OR customer_email so we catch orders attached either way
+    const { data } = await ordersAPI.getOrders(customer.id, customer.email);
     setOrders(data);
-  }, [customer?.id]);
+  }, [customer?.id, customer?.email]);
 
   useEffect(() => {
     (async () => {

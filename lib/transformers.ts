@@ -84,9 +84,11 @@ export function transformPartner(p: any): Partner {
 export function transformOrder(o: any): Order {
   return {
     id: String(o.id),
+    // Real orders table doesn't have a short_id column — derive one from the UUID
     shortId: o.short_id || String(o.id).slice(0, 8).toUpperCase(),
     status: o.order_status || o.status || "pending",
-    createdAt: o.created_at,
+    // Use updated_at (created_at doesn't exist on the orders table)
+    createdAt: o.updated_at || o.created_at,
     total: Number(o.total) || 0,
     itemsCount: o.items_count || (o.order_items?.length ?? 0),
     items: o.order_items?.map((oi: any) => ({
