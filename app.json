@@ -28,10 +28,6 @@
       "bundler": "metro",
       "favicon": "./assets/icon.png"
     },
-<<<<<<< Updated upstream
-  
-=======
->>>>>>> Stashed changes
     "plugins": ["expo-router"],
     "experiments": {
       "typedRoutes": false
