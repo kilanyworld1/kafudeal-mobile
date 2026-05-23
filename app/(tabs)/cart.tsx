@@ -1,4 +1,5 @@
-import { View, Text, ScrollView, Pressable, Image, StyleSheet } from "react-native";
+import { useRef } from "react";
+import { View, Text, ScrollView, Pressable, Image, StyleSheet, Animated } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
@@ -7,7 +8,7 @@ import { useCart } from "../../lib/cart-context";
 export default function Cart() {
   const insets = useSafeAreaInsets();
   const { items, subtotal, count, setQty, remove } = useCart();
-  const delivery = items.length > 0 ? 15 : 0;
+  const delivery = items.length > 0 ? (subtotal >= 100 ? 0 : 15) : 0;
   const total = subtotal + delivery;
 
   return (
@@ -19,7 +20,7 @@ export default function Cart() {
 
       {items.length === 0 ? (
         <View style={s.empty}>
-          <Ionicons name="cart-outline" size={64} color="#CBD5E1" />
+          <Text style={{ fontSize: 64 }}>🛒</Text>
           <Text style={s.emptyTitle}>Your cart is empty</Text>
           <Text style={s.emptySub}>Add deals you love and check out when ready</Text>
           <Pressable onPress={() => router.push("/(tabs)/deals")} style={s.emptyBtn}>
@@ -30,30 +31,14 @@ export default function Cart() {
         <>
           <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 200 }}>
             {items.map((it) => (
-              <View key={it.product.id} style={s.item}>
-                <Image source={{ uri: it.product.image }} style={s.itemImg} />
-                <View style={{ flex: 1, justifyContent: "space-between" }}>
-                  <View>
-                    <Text style={s.itemName} numberOfLines={1}>{it.product.name}</Text>
-                    <Text style={s.itemStore}>{it.product.store}</Text>
-                  </View>
-                  <View style={s.itemRow}>
-                    <Text style={s.itemPrice}>AED {(it.product.price * it.qty).toFixed(2)}</Text>
-                    <View style={s.qty}>
-                      <Pressable onPress={() => setQty(it.product.id, it.qty - 1)} style={s.qtyBtn}>
-                        <Ionicons name="remove" size={16} color="#0F172A" />
-                      </Pressable>
-                      <Text style={s.qtyText}>{it.qty}</Text>
-                      <Pressable onPress={() => setQty(it.product.id, it.qty + 1)} style={s.qtyBtn}>
-                        <Ionicons name="add" size={16} color="#0F172A" />
-                      </Pressable>
-                    </View>
-                  </View>
-                </View>
-                <Pressable onPress={() => remove(it.product.id)} style={s.removeBtn}>
-                  <Ionicons name="close" size={16} color="#94A3B8" />
-                </Pressable>
-              </View>
+              <CartItemRow
+                key={it.product.id}
+                product={it.product}
+                qty={it.qty}
+                onInc={() => setQty(it.product.id, it.qty + 1)}
+                onDec={() => setQty(it.product.id, it.qty - 1)}
+                onRemove={() => remove(it.product.id)}
+              />
             ))}
 
             <View style={s.summary}>
@@ -62,9 +47,16 @@ export default function Cart() {
                 <Text style={s.summaryVal}>AED {subtotal.toFixed(2)}</Text>
               </View>
               <View style={[s.summaryRow, { marginTop: 8 }]}>
-                <Text style={s.summaryLbl}>Delivery</Text>
-                <Text style={s.summaryVal}>AED {delivery.toFixed(2)}</Text>
+                <Text style={s.summaryLbl}>Delivery {subtotal >= 100 ? "(free)" : ""}</Text>
+                <Text style={[s.summaryVal, delivery === 0 && { color: "#16A34A" }]}>
+                  {delivery === 0 ? "FREE" : `AED ${delivery.toFixed(2)}`}
+                </Text>
               </View>
+              {subtotal < 100 && (
+                <Text style={s.freeShipHint}>
+                  Add AED {(100 - subtotal).toFixed(2)} more for FREE delivery
+                </Text>
+              )}
               <View style={s.divider} />
               <View style={s.summaryRow}>
                 <Text style={s.totalLbl}>Total</Text>
@@ -84,6 +76,82 @@ export default function Cart() {
   );
 }
 
+function CartItemRow({
+  product, qty, onInc, onDec, onRemove,
+}: {
+  product: any; qty: number;
+  onInc: () => void; onDec: () => void; onRemove: () => void;
+}) {
+  const qtyScale = useRef(new Animated.Value(1)).current;
+  const incBg = useRef(new Animated.Value(0)).current;
+  const decBg = useRef(new Animated.Value(0)).current;
+
+  const bumpQty = () => {
+    Animated.sequence([
+      Animated.timing(qtyScale, { toValue: 1.3, duration: 130, useNativeDriver: true }),
+      Animated.spring(qtyScale, { toValue: 1, friction: 4, useNativeDriver: true }),
+    ]).start();
+  };
+  const flash = (val: Animated.Value) => {
+    Animated.sequence([
+      Animated.timing(val, { toValue: 1, duration: 90, useNativeDriver: false }),
+      Animated.timing(val, { toValue: 0, duration: 240, useNativeDriver: false }),
+    ]).start();
+  };
+
+  const incBgColor = incBg.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["#F1EFE8", "#FF6B2C"],
+  });
+  const decBgColor = decBg.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["#F1EFE8", qty === 1 ? "#FEE2E2" : "#FF6B2C"],
+  });
+
+  return (
+    <View style={s.item}>
+      <Image source={{ uri: product.image }} style={s.itemImg} />
+      <View style={{ flex: 1, justifyContent: "space-between" }}>
+        <View>
+          <Text style={s.itemName} numberOfLines={1}>{product.name}</Text>
+          <Text style={s.itemStore}>{product.store}</Text>
+        </View>
+        <View style={s.itemRow}>
+          <Text style={s.itemPrice}>AED {(product.discountedPrice * qty).toFixed(2)}</Text>
+          <View style={s.qty}>
+            <Pressable
+              onPress={() => { onDec(); bumpQty(); flash(decBg); }}
+              hitSlop={6}
+            >
+              <Animated.View style={[s.qtyBtn, { backgroundColor: decBgColor }]}>
+                {qty === 1 ? (
+                  <Ionicons name="trash-outline" size={14} color="#DC2626" />
+                ) : (
+                  <Ionicons name="remove" size={16} color="#0F172A" />
+                )}
+              </Animated.View>
+            </Pressable>
+            <Animated.Text style={[s.qtyText, { transform: [{ scale: qtyScale }] }]}>
+              {qty}
+            </Animated.Text>
+            <Pressable
+              onPress={() => { onInc(); bumpQty(); flash(incBg); }}
+              hitSlop={6}
+            >
+              <Animated.View style={[s.qtyBtn, { backgroundColor: incBgColor }]}>
+                <Ionicons name="add" size={16} color="#0F172A" />
+              </Animated.View>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+      <Pressable onPress={onRemove} style={s.removeBtn} hitSlop={6}>
+        <Ionicons name="close" size={16} color="#94A3B8" />
+      </Pressable>
+    </View>
+  );
+}
+
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#FFF9F2" },
   header: {
@@ -93,7 +161,7 @@ const s = StyleSheet.create({
   title: { fontSize: 26, fontWeight: "800", color: "#0F172A", letterSpacing: -0.5 },
   subtitle: { fontSize: 13, color: "#64748B", marginTop: 2 },
   empty: { flex: 1, alignItems: "center", justifyContent: "center", padding: 40 },
-  emptyTitle: { fontSize: 18, fontWeight: "800", color: "#0F172A", marginTop: 18 },
+  emptyTitle: { fontSize: 18, fontWeight: "800", color: "#0F172A", marginTop: 14 },
   emptySub: { fontSize: 13, color: "#64748B", marginTop: 8, textAlign: "center" },
   emptyBtn: {
     backgroundColor: "#FF6B2C", paddingHorizontal: 24, paddingVertical: 14,
@@ -107,17 +175,19 @@ const s = StyleSheet.create({
     shadowColor: "#0F172A", shadowOpacity: 0.04,
     shadowOffset: { width: 0, height: 2 }, shadowRadius: 6,
   },
-  itemImg: { width: 70, height: 70, borderRadius: 10 },
+  itemImg: { width: 70, height: 70, borderRadius: 10, backgroundColor: "#F1EFE8" },
   itemName: { fontSize: 14, fontWeight: "700", color: "#0F172A" },
   itemStore: { fontSize: 11, color: "#64748B", marginTop: 2 },
   itemRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   itemPrice: { color: "#FF6B2C", fontSize: 15, fontWeight: "800" },
   qty: {
-    flexDirection: "row", alignItems: "center",
-    backgroundColor: "#F1EFE8", borderRadius: 999, paddingHorizontal: 4,
+    flexDirection: "row", alignItems: "center", gap: 4,
   },
-  qtyBtn: { width: 28, height: 28, alignItems: "center", justifyContent: "center" },
-  qtyText: { fontSize: 14, fontWeight: "800", color: "#0F172A", minWidth: 18, textAlign: "center" },
+  qtyBtn: {
+    width: 30, height: 30, borderRadius: 15,
+    alignItems: "center", justifyContent: "center",
+  },
+  qtyText: { fontSize: 15, fontWeight: "800", color: "#0F172A", minWidth: 20, textAlign: "center" },
   removeBtn: {
     position: "absolute", top: 8, right: 8,
     width: 24, height: 24, borderRadius: 12,
@@ -127,6 +197,7 @@ const s = StyleSheet.create({
   summaryRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   summaryLbl: { color: "#64748B", fontSize: 13 },
   summaryVal: { fontWeight: "700", color: "#0F172A" },
+  freeShipHint: { color: "#FF6B2C", fontSize: 11.5, fontWeight: "700", marginTop: 6 },
   divider: { height: 1, backgroundColor: "rgba(15,23,42,0.06)", marginVertical: 12 },
   totalLbl: { fontSize: 16, fontWeight: "800", color: "#0F172A" },
   totalVal: { fontSize: 20, fontWeight: "800", color: "#FF6B2C" },

@@ -1,5 +1,8 @@
-import { useEffect, useState, useMemo } from "react";
-import { View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator } from "react-native";
+import { useEffect, useState, useMemo, useRef } from "react";
+import {
+  View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator,
+  Animated, Image,
+} from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -18,6 +21,8 @@ const PHRASES = [
   "Try 'strawberries'",
 ];
 
+const ALL = "All";
+
 export default function Home() {
   const insets = useSafeAreaInsets();
   const { user, customer } = useAuth();
@@ -25,8 +30,13 @@ export default function Home() {
   const [products, setProducts] = useState<Product[]>([]);
   const [liveCategories, setLiveCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedCat, setSelectedCat] = useState<string>(ALL);
 
-  // Typewriter loop
+  // Sticky header animation
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const STICKY_THRESHOLD = 220;
+
+  // Typewriter
   useEffect(() => {
     let pi = 0, ci = 0, deleting = false;
     let timer: any;
@@ -35,18 +45,11 @@ export default function Home() {
       if (!deleting) {
         ci++;
         setPlaceholder(word.slice(0, ci));
-        if (ci === word.length) {
-          deleting = true;
-          timer = setTimeout(tick, 1600);
-          return;
-        }
+        if (ci === word.length) { deleting = true; timer = setTimeout(tick, 1600); return; }
       } else {
         ci--;
         setPlaceholder(word.slice(0, ci));
-        if (ci === 0) {
-          deleting = false;
-          pi = (pi + 1) % PHRASES.length;
-        }
+        if (ci === 0) { deleting = false; pi = (pi + 1) % PHRASES.length; }
       }
       timer = setTimeout(tick, deleting ? 35 : 75);
     };
@@ -54,7 +57,7 @@ export default function Home() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Fetch live data
+  // Fetch live
   useEffect(() => {
     (async () => {
       setLoading(true);
@@ -68,209 +71,289 @@ export default function Home() {
     })();
   }, []);
 
-  // Curate sections from live data
-  const sections = useMemo(() => {
-    const endingSoon = [...products]
-      .filter((p) => p.urgent)
-      .slice(0, 12);
-    const topDeals = [...products]
-      .sort((a, b) => b.discount - a.discount)
-      .slice(0, 12);
-    const freshAndBakery = products.filter(
-      (p) => p.category === "Fresh" || p.category === "Bakery"
-    ).slice(0, 12);
-    const beautyAndSnacks = products.filter(
-      (p) => p.category === "Beauty" || p.category === "Snacks"
-    ).slice(0, 12);
-    return { endingSoon, topDeals, freshAndBakery, beautyAndSnacks };
-  }, [products]);
+  // Filter by selected category
+  const filteredProducts = useMemo(() => {
+    if (selectedCat === ALL) return products;
+    return products.filter((p) => p.category.toLowerCase() === selectedCat.toLowerCase());
+  }, [products, selectedCat]);
 
-  // Merge live categories with static icon metadata
+  const sections = useMemo(() => {
+    const list = filteredProducts;
+    const endingSoon = list.filter((p) => p.urgent).slice(0, 12);
+    const topDeals = [...list].sort((a, b) => b.discount - a.discount).slice(0, 12);
+    return { endingSoon, topDeals };
+  }, [filteredProducts]);
+
+  // Categories with icon metadata
   const displayCategories = useMemo(() => {
-    if (liveCategories.length === 0) return STATIC_CATS;
-    return liveCategories.slice(0, 7).map((c) => {
-      const match = STATIC_CATS.find((s) => s.label.toLowerCase() === c.name.toLowerCase());
-      return {
-        key: c.id,
-        label: c.name,
-        emoji: c.icon || match?.emoji || "🛒",
-        tint: match?.tint || "#FFE7D1",
-        tag: match?.tag,
-        hot: match?.hot,
-      };
-    });
+    const arr = [{ key: ALL, label: ALL, emoji: "✨", tint: "#FFF1E5" } as any];
+    if (liveCategories.length > 0) {
+      liveCategories.slice(0, 7).forEach((c) => {
+        const match = STATIC_CATS.find((sc) => sc.label.toLowerCase() === c.name.toLowerCase());
+        arr.push({
+          key: c.name,
+          label: c.name,
+          emoji: c.icon || match?.emoji || "🛒",
+          tint: match?.tint || "#FFE7D1",
+        });
+      });
+    } else {
+      STATIC_CATS.forEach((c) => arr.push({ key: c.label, label: c.label, emoji: c.emoji, tint: c.tint }));
+    }
+    return arr;
   }, [liveCategories]);
 
+  const avatarUrl =
+    (user?.user_metadata?.avatar_url as string) ||
+    (user?.user_metadata?.picture as string) ||
+    "";
+
+  // Sticky header interpolations
+  const stickyOpacity = scrollY.interpolate({
+    inputRange: [STICKY_THRESHOLD - 40, STICKY_THRESHOLD],
+    outputRange: [0, 1],
+    extrapolate: "clamp",
+  });
+  const stickyTranslate = scrollY.interpolate({
+    inputRange: [STICKY_THRESHOLD - 40, STICKY_THRESHOLD],
+    outputRange: [-50, 0],
+    extrapolate: "clamp",
+  });
+
   return (
-    <ScrollView
-      style={s.scroll}
-      contentContainerStyle={{ paddingBottom: 30 }}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Orange Banner */}
-      <LinearGradient
-        colors={["#FF6B2C", "#FF8C3A", "#FFA45E"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0.2, y: 1 }}
-        style={[s.banner, { paddingTop: insets.top + 16 }]}
+    <View style={s.root}>
+      {/* Sticky mini-header (appears on scroll) */}
+      <Animated.View
+        pointerEvents="box-none"
+        style={[
+          s.stickyHeader,
+          {
+            paddingTop: insets.top + 6,
+            opacity: stickyOpacity,
+            transform: [{ translateY: stickyTranslate }],
+          },
+        ]}
       >
-        <View style={s.topRow}>
-          <Pressable style={{ flex: 1 }}>
-            <Text style={s.eyebrow}>DELIVER TO</Text>
-            <View style={s.locationRow}>
-              <Ionicons name="location-sharp" size={14} color="white" />
-              <Text style={s.locationText}>Dubai Marina · JLT</Text>
-              <Ionicons name="chevron-down" size={14} color="white" style={{ marginLeft: 4, opacity: 0.7 }} />
-            </View>
-          </Pressable>
-
-          <View style={s.actionsRow}>
-            <Pressable onPress={() => router.push("/saved")} style={s.iconBtn}>
-              <Ionicons name="heart-outline" size={18} color="white" />
+        <View style={s.stickyTopRow}>
+          <View style={s.stickyLoc}>
+            <Ionicons name="location-sharp" size={14} color="#FF6B2C" />
+            <Text style={s.stickyLocText}>Dubai Marina · JLT</Text>
+          </View>
+          <View style={{ flexDirection: "row", gap: 6 }}>
+            <Pressable onPress={() => router.push("/saved")} style={s.stickyIconBtn}>
+              <Ionicons name="heart-outline" size={18} color="#0F172A" />
             </Pressable>
-            <Pressable onPress={() => router.push("/notifications")} style={s.iconBtn}>
-              <Ionicons name="notifications-outline" size={18} color="white" />
-              <View style={s.iconDot} />
+            <Pressable onPress={() => router.push("/notifications")} style={s.stickyIconBtn}>
+              <Ionicons name="notifications-outline" size={18} color="#0F172A" />
+              <View style={s.stickyDot} />
             </Pressable>
+            {avatarUrl ? (
+              <Pressable onPress={() => router.push("/(tabs)/account")}>
+                <Image source={{ uri: avatarUrl }} style={s.stickyAvatar} />
+              </Pressable>
+            ) : null}
           </View>
         </View>
 
-        {/* Search bar */}
-        <Pressable onPress={() => router.push("/search")} style={s.search}>
-          <Ionicons name="search" size={20} color="#334155" />
-          <Text style={s.searchPlaceholder}>
-            {placeholder}
-            <Text style={s.cursor}>|</Text>
-          </Text>
-        </Pressable>
+        {/* Tiny inline category chips */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingVertical: 6 }}
+        >
+          {displayCategories.map((c) => {
+            const active = selectedCat === c.key;
+            return (
+              <Pressable
+                key={c.key}
+                onPress={() => setSelectedCat(c.key)}
+                style={[s.miniChip, active && s.miniChipActive]}
+              >
+                <Text style={{ fontSize: 12 }}>{c.emoji}</Text>
+                <Text style={[s.miniChipText, active && s.miniChipTextActive]}>{c.label}</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </Animated.View>
 
-        {/* Trust strip */}
-        <View style={s.trustRow}>
-          {[
-            { num: "−70%", lbl: "OFF GROCERIES" },
-            { num: "2h", lbl: "AVG DELIVERY" },
-            { num: "100%", lbl: "VERIFIED STORES" },
-          ].map((t, i) => (
-            <View key={i} style={s.trustItem}>
-              <Text style={s.trustNum}>{t.num}</Text>
-              <Text style={s.trustLbl}>{t.lbl}</Text>
-            </View>
-          ))}
-        </View>
-      </LinearGradient>
-
-      {/* Categories */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}
-        style={{ marginTop: -28 }}
+      <Animated.ScrollView
+        style={s.scroll}
+        contentContainerStyle={{ paddingBottom: 30 }}
+        showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: true }
+        )}
       >
-        {displayCategories.map((c) => (
-          <Pressable
-            key={c.key}
-            onPress={() => router.push("/(tabs)/deals")}
-            style={s.catWrap}
-          >
-            <View style={[s.catArt, { backgroundColor: c.tint }]}>
-              <Text style={{ fontSize: 36 }}>{c.emoji}</Text>
-              {c.tag && (
-                <View style={[s.catTag, { backgroundColor: c.hot ? "#FF6B2C" : "#0F172A" }]}>
-                  <Text style={s.catTagText}>{c.tag}</Text>
+        {/* Orange Banner */}
+        <LinearGradient
+          colors={["#FF6B2C", "#FF8C3A", "#FFA45E"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0.2, y: 1 }}
+          style={[s.banner, { paddingTop: insets.top + 16 }]}
+        >
+          <View style={s.topRow}>
+            <Pressable style={{ flex: 1 }}>
+              <Text style={s.eyebrow}>DELIVER TO</Text>
+              <View style={s.locationRow}>
+                <Ionicons name="location-sharp" size={14} color="white" />
+                <Text style={s.locationText}>Dubai Marina · JLT</Text>
+                <Ionicons name="chevron-down" size={14} color="white" style={{ marginLeft: 4, opacity: 0.7 }} />
+              </View>
+            </Pressable>
+
+            <View style={s.actionsRow}>
+              <Pressable onPress={() => router.push("/saved")} style={s.iconBtn}>
+                <Ionicons name="heart-outline" size={18} color="white" />
+              </Pressable>
+              <Pressable onPress={() => router.push("/notifications")} style={s.iconBtn}>
+                <Ionicons name="notifications-outline" size={18} color="white" />
+                <View style={s.iconDot} />
+              </Pressable>
+              {avatarUrl ? (
+                <Pressable onPress={() => router.push("/(tabs)/account")}>
+                  <Image source={{ uri: avatarUrl }} style={s.headerAvatar} />
+                </Pressable>
+              ) : null}
+            </View>
+          </View>
+
+          <Pressable onPress={() => router.push("/search")} style={s.search}>
+            <Ionicons name="search" size={20} color="#334155" />
+            <Text style={s.searchPlaceholder}>
+              {placeholder}
+              <Text style={s.cursor}>|</Text>
+            </Text>
+          </Pressable>
+
+          <View style={s.trustRow}>
+            {[
+              { num: "−70%", lbl: "OFF GROCERIES" },
+              { num: "2h", lbl: "AVG DELIVERY" },
+              { num: "100%", lbl: "VERIFIED STORES" },
+            ].map((t, i) => (
+              <View key={i} style={s.trustItem}>
+                <Text style={s.trustNum}>{t.num}</Text>
+                <Text style={s.trustLbl}>{t.lbl}</Text>
+              </View>
+            ))}
+          </View>
+        </LinearGradient>
+
+        {/* Category chips (big) */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}
+          style={{ marginTop: -28 }}
+        >
+          {displayCategories.map((c) => {
+            const active = selectedCat === c.key;
+            return (
+              <Pressable
+                key={c.key}
+                onPress={() => setSelectedCat(c.key)}
+                style={s.catWrap}
+              >
+                <View style={[
+                  s.catArt,
+                  { backgroundColor: c.tint },
+                  active && s.catArtActive,
+                ]}>
+                  <Text style={{ fontSize: 36 }}>{c.emoji}</Text>
                 </View>
-              )}
+                <Text style={[s.catName, active && { color: "#FF6B2C" }]}>{c.label}</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
+        {/* Sign-in pill */}
+        {!user && (
+          <Pressable onPress={() => router.push("/login")} style={s.signinCard}>
+            <View style={s.signinIcon}>
+              <Ionicons name="person" size={22} color="#FF6B2C" />
             </View>
-            <Text style={s.catName}>{c.label}</Text>
-          </Pressable>
-        ))}
-      </ScrollView>
-
-      {/* Sign-in pill (only if not logged in) */}
-      {!user && (
-        <Pressable onPress={() => router.push("/login")} style={s.signinCard}>
-          <View style={s.signinIcon}>
-            <Ionicons name="person" size={22} color="#FF6B2C" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={s.signinTitle}>Hey there! 👋</Text>
-            <Text style={s.signinSub}>Sign in for personalised deals & order tracking</Text>
-          </View>
-          <View style={s.signinBtn}>
-            <Text style={s.signinBtnText}>Sign in</Text>
-          </View>
-        </Pressable>
-      )}
-
-      {user && customer && (
-        <View style={s.welcomeBack}>
-          <Text style={s.welcomeBackText}>
-            Welcome back, {customer.fullName?.split(" ")[0] || "friend"} 👋
-          </Text>
-        </View>
-      )}
-
-      {loading ? (
-        <View style={s.loadingBlock}>
-          <ActivityIndicator color="#FF6B2C" size="large" />
-          <Text style={s.loadingText}>Finding fresh deals…</Text>
-        </View>
-      ) : products.length === 0 ? (
-        <View style={s.loadingBlock}>
-          <Ionicons name="cloud-offline-outline" size={42} color="#94A3B8" />
-          <Text style={s.loadingText}>No deals available right now</Text>
-          <Text style={s.loadingSub}>Pull to refresh or check back later</Text>
-        </View>
-      ) : (
-        <>
-          <Section
-            title="Ending soon 🔥"
-            sub="Grab these before they're gone"
-            onSeeAll={() => router.push("/(tabs)/deals")}
-          />
-          <HScroll items={sections.endingSoon.length ? sections.endingSoon : products.slice(0, 8)} />
-
-          <Section
-            title="Top deals near you"
-            sub="Biggest discounts today"
-            onSeeAll={() => router.push("/(tabs)/deals")}
-          />
-          <HScroll items={sections.topDeals} />
-
-          <View style={s.proBanner}>
             <View style={{ flex: 1 }}>
-              <Text style={s.proBannerTitle}>KafuDeal Pro</Text>
-              <Text style={s.proBannerSub}>Free delivery + early access to drops</Text>
-              <Text style={s.proBannerCta}>Try free for 30 days →</Text>
+              <Text style={s.signinTitle}>Hey there! 👋</Text>
+              <Text style={s.signinSub}>Sign in for personalised deals & order tracking</Text>
             </View>
-            <View style={s.proBannerIcon}>
-              <Ionicons name="star" size={24} color="white" />
+            <View style={s.signinBtn}>
+              <Text style={s.signinBtnText}>Sign in</Text>
             </View>
+          </Pressable>
+        )}
+
+        {user && customer && (
+          <View style={s.welcomeBack}>
+            <Text style={s.welcomeBackText}>
+              Welcome back, {customer.fullName?.split(" ")[0] || "friend"} 👋
+            </Text>
           </View>
+        )}
 
-          {sections.freshAndBakery.length > 0 && (
-            <>
-              <Section
-                title="Fresh & Bakery 🥖"
-                sub="Today's best from our partners"
-                onSeeAll={() => router.push("/(tabs)/deals")}
-              />
-              <HScroll items={sections.freshAndBakery} />
-            </>
-          )}
+        {loading ? (
+          <View style={s.loadingBlock}>
+            <ActivityIndicator color="#FF6B2C" size="large" />
+            <Text style={s.loadingText}>Finding fresh deals…</Text>
+          </View>
+        ) : filteredProducts.length === 0 ? (
+          <View style={s.loadingBlock}>
+            <Text style={{ fontSize: 56 }}>🧐</Text>
+            <Text style={s.loadingText}>
+              {selectedCat === ALL ? "No deals available right now" : `No ${selectedCat} deals right now`}
+            </Text>
+            {selectedCat !== ALL && (
+              <Pressable onPress={() => setSelectedCat(ALL)} style={s.loadingResetBtn}>
+                <Text style={s.loadingResetText}>Show all deals</Text>
+              </Pressable>
+            )}
+          </View>
+        ) : (
+          <>
+            {sections.endingSoon.length > 0 && (
+              <>
+                <Section
+                  title={selectedCat === ALL ? "Ending soon 🔥" : `${selectedCat} · Ending soon 🔥`}
+                  sub="Grab these before they're gone"
+                  onSeeAll={() => router.push("/(tabs)/deals")}
+                />
+                <HScroll items={sections.endingSoon} />
+              </>
+            )}
 
-          {sections.beautyAndSnacks.length > 0 && (
-            <>
-              <Section
-                title="Beauty & Snacks"
-                sub="Treats worth saving"
-                onSeeAll={() => router.push("/(tabs)/deals")}
-              />
-              <HScroll items={sections.beautyAndSnacks} />
-            </>
-          )}
-        </>
-      )}
-    </ScrollView>
+            <Section
+              title={selectedCat === ALL ? "Top deals near you" : `${selectedCat} · Top deals`}
+              sub="Biggest discounts today"
+              onSeeAll={() => router.push("/(tabs)/deals")}
+            />
+            <HScroll items={sections.topDeals.length ? sections.topDeals : filteredProducts.slice(0, 12)} />
+
+            {selectedCat === ALL && (
+              <View style={s.proBanner}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.proBannerTitle}>KafuDeal Pro</Text>
+                  <Text style={s.proBannerSub}>Free delivery + early access to drops</Text>
+                  <Text style={s.proBannerCta}>Try free for 30 days →</Text>
+                </View>
+                <View style={s.proBannerIcon}>
+                  <Ionicons name="star" size={24} color="white" />
+                </View>
+              </View>
+            )}
+
+            <Section
+              title={selectedCat === ALL ? "All deals" : `All ${selectedCat}`}
+              sub={`${filteredProducts.length} items`}
+              onSeeAll={() => router.push("/(tabs)/deals")}
+            />
+            <HScroll items={filteredProducts} />
+          </>
+        )}
+      </Animated.ScrollView>
+    </View>
   );
 }
 
@@ -305,7 +388,42 @@ function HScroll({ items }: { items: Product[] }) {
 }
 
 const s = StyleSheet.create({
-  scroll: { flex: 1, backgroundColor: "#FFF9F2" },
+  root: { flex: 1, backgroundColor: "#FFF9F2" },
+  scroll: { flex: 1 },
+  stickyHeader: {
+    position: "absolute", top: 0, left: 0, right: 0, zIndex: 10,
+    backgroundColor: "white",
+    shadowColor: "#0F172A", shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 4 }, shadowRadius: 10,
+    elevation: 8,
+    borderBottomLeftRadius: 16, borderBottomRightRadius: 16,
+  },
+  stickyTopRow: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    paddingHorizontal: 16, paddingTop: 4, paddingBottom: 4,
+  },
+  stickyLoc: { flexDirection: "row", alignItems: "center", gap: 5 },
+  stickyLocText: { fontSize: 13, fontWeight: "800", color: "#0F172A" },
+  stickyIconBtn: {
+    width: 34, height: 34, borderRadius: 17,
+    backgroundColor: "#F1EFE8",
+    alignItems: "center", justifyContent: "center",
+  },
+  stickyDot: {
+    position: "absolute", top: 6, right: 7, width: 8, height: 8,
+    borderRadius: 4, backgroundColor: "#FF6B2C",
+    borderWidth: 2, borderColor: "white",
+  },
+  stickyAvatar: { width: 34, height: 34, borderRadius: 17, backgroundColor: "#F1EFE8" },
+  miniChip: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    paddingHorizontal: 11, paddingVertical: 6, borderRadius: 999,
+    backgroundColor: "#F1EFE8",
+  },
+  miniChipActive: { backgroundColor: "#0F172A" },
+  miniChipText: { fontSize: 12, fontWeight: "700", color: "#334155" },
+  miniChipTextActive: { color: "white" },
+
   banner: {
     paddingHorizontal: 20, paddingBottom: 60,
     borderBottomLeftRadius: 26, borderBottomRightRadius: 26,
@@ -314,7 +432,7 @@ const s = StyleSheet.create({
   eyebrow: { color: "rgba(255,255,255,0.78)", fontSize: 10.5, fontWeight: "700", letterSpacing: 1.6 },
   locationRow: { flexDirection: "row", alignItems: "center", marginTop: 4 },
   locationText: { color: "white", fontSize: 16, fontWeight: "800", marginLeft: 6, letterSpacing: -0.2 },
-  actionsRow: { flexDirection: "row", gap: 8 },
+  actionsRow: { flexDirection: "row", gap: 8, alignItems: "center" },
   iconBtn: {
     width: 40, height: 40, borderRadius: 20,
     backgroundColor: "rgba(255,255,255,0.20)",
@@ -325,6 +443,10 @@ const s = StyleSheet.create({
     position: "absolute", top: 8, right: 9, width: 9, height: 9,
     borderRadius: 4.5, backgroundColor: "#FFC857",
     borderWidth: 2, borderColor: "#FF8C3A",
+  },
+  headerAvatar: {
+    width: 40, height: 40, borderRadius: 20,
+    borderWidth: 2, borderColor: "rgba(255,255,255,0.6)",
   },
   search: {
     marginTop: 18, backgroundColor: "white", borderRadius: 14,
@@ -351,13 +473,9 @@ const s = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
     shadowColor: "#0F172A", shadowOpacity: 0.06,
     shadowOffset: { width: 0, height: 4 }, shadowRadius: 14,
-    borderWidth: 1, borderColor: "rgba(255,255,255,0.6)",
+    borderWidth: 2, borderColor: "transparent",
   },
-  catTag: {
-    position: "absolute", bottom: 5, left: 5,
-    paddingHorizontal: 6, paddingVertical: 3, borderRadius: 5,
-  },
-  catTagText: { color: "white", fontSize: 8.5, fontWeight: "800" },
+  catArtActive: { borderColor: "#FF6B2C" },
   catName: { marginTop: 9, fontSize: 12.5, fontWeight: "700", color: "#0F172A" },
   signinCard: {
     marginHorizontal: 16, marginTop: 18,
@@ -381,8 +499,12 @@ const s = StyleSheet.create({
   welcomeBack: { paddingHorizontal: 20, marginTop: 14 },
   welcomeBackText: { fontSize: 15, fontWeight: "800", color: "#0F172A" },
   loadingBlock: { padding: 60, alignItems: "center", justifyContent: "center" },
-  loadingText: { fontSize: 14, color: "#64748B", marginTop: 14, fontWeight: "600" },
-  loadingSub: { fontSize: 12, color: "#94A3B8", marginTop: 6 },
+  loadingText: { fontSize: 14, color: "#64748B", marginTop: 14, fontWeight: "600", textAlign: "center" },
+  loadingResetBtn: {
+    backgroundColor: "#FF6B2C", paddingHorizontal: 22, paddingVertical: 12,
+    borderRadius: 10, marginTop: 18,
+  },
+  loadingResetText: { color: "white", fontSize: 13, fontWeight: "800" },
   sectionHead: {
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",
     paddingHorizontal: 16, marginTop: 24, marginBottom: 12,
