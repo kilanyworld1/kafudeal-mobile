@@ -5,8 +5,8 @@ import * as Linking from "expo-linking";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 import { authAPI } from "./api";
+import { transformCustomer } from "./transformers";
 import type { Customer } from "./types";
-import { APP_SCHEME } from "./config";
 
 type AuthContextValue = {
   session: Session | null;
@@ -28,32 +28,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Listen for auth state changes
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
     return () => subscription.unsubscribe();
   }, []);
 
-  // When user logs in, ensure a customer row exists
+  // Trust the server-side trigger (handle_new_user) to create the customers row.
+  // We just READ the profile. If the trigger hasn't run yet for a brand-new
+  // signup, retry a couple of times.
   useEffect(() => {
     if (!session?.user) {
       setCustomer(null);
       return;
     }
+    let cancelled = false;
     (async () => {
-      const c = await authAPI.getOrCreateCustomer(
-        session.user.id,
-        session.user.email ?? undefined,
-        (session.user.user_metadata?.full_name as string) ?? undefined
-      );
-      setCustomer(c);
+      for (let attempt = 0; attempt < 4; attempt++) {
+        const { data } = await authAPI.getProfile();
+        if (cancelled) return;
+        if (data) {
+          setCustomer(transformCustomer(data));
+          return;
+        }
+        // wait a bit for the trigger to fire on first signup
+        await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+      }
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [session?.user?.id]);
 
   const signInWithProvider = useCallback(async (provider: "google" | "apple" | "facebook") => {
@@ -83,7 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        // Fallback: some providers return a `code` query param (e.g. when flow auto-falls-back to PKCE)
+        // Fallback: code query param (PKCE)
         const url = new URL(result.url);
         const code = url.searchParams.get("code");
         if (code) {
@@ -92,8 +103,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        // Surface error if neither tokens nor code came back
-        const oauthError = fragParams.get("error_description") || url.searchParams.get("error_description");
+        const oauthError =
+          fragParams.get("error_description") || url.searchParams.get("error_description");
         if (oauthError) throw new Error(oauthError);
       }
     } catch (e: any) {
@@ -102,8 +113,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const signInWithGoogle   = useCallback(() => signInWithProvider("google"),   [signInWithProvider]);
-  const signInWithApple    = useCallback(() => signInWithProvider("apple"),    [signInWithProvider]);
+  const signInWithGoogle = useCallback(() => signInWithProvider("google"), [signInWithProvider]);
+  const signInWithApple = useCallback(() => signInWithProvider("apple"), [signInWithProvider]);
   const signInWithFacebook = useCallback(() => signInWithProvider("facebook"), [signInWithProvider]);
 
   const signOut = useCallback(async () => {

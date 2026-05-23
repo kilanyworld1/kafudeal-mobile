@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useFocusEffect } from "expo-router";
 import { productsAPI, categoriesAPI } from "../../lib/api";
+import { transformProduct, transformCategory } from "../../lib/transformers";
 import type { Product, Category } from "../../lib/types";
 import ProductCard from "../../components/ProductCard";
 
@@ -20,8 +21,8 @@ export default function Deals() {
       productsAPI.getProducts({ from: 0, to: 200, excludeExpired: true }),
       categoriesAPI.getCategories(),
     ]);
-    setProducts(prods);
-    setCats(c);
+    setProducts((prods || []).map(transformProduct));
+    setCats((c || []).map(transformCategory));
   }, []);
 
   useEffect(() => {

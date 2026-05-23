@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useFocusEffect } from "expo-router";
 import { productsAPI } from "../lib/api";
+import { transformProduct } from "../lib/transformers";
 import type { Product } from "../lib/types";
 import { useCart } from "../lib/cart-context";
 import ProductCard from "../components/ProductCard";
@@ -17,7 +18,7 @@ export default function Saved() {
 
   const fetchAll = useCallback(async () => {
     const { data } = await productsAPI.getProducts({ from: 0, to: 200 });
-    setAllProducts(data);
+    setAllProducts((data || []).map(transformProduct));
   }, []);
 
   useEffect(() => {

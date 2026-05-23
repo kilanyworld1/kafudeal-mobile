@@ -1,384 +1,784 @@
+/**
+ * KafuDeal Mobile data layer — verbatim port of kafudeal.com's lib/api.js.
+ *
+ * Do NOT diverge from the web's shape. When the web's api.js is updated, copy
+ * the changes here so both platforms stay in sync. Convert .js → .ts only.
+ */
+
 import { supabase } from "./supabase";
-import {
-  transformProduct,
-  transformCategory,
-  transformPartner,
-  transformOrder,
-} from "./transformers";
-import type { Product, Category, Partner, Order, Customer } from "./types";
 
-// ─── PRODUCTS ───────────────────────────────────────────────────────────────
-
-export const productsAPI = {
-  async getProducts(opts: { from?: number; to?: number; excludeExpired?: boolean } = {}) {
-    const { from = 0, to = 999, excludeExpired = false } = opts;
-    let q = supabase
-      .from("products")
-      .select("*, partners(name, logo_url), categories(name, icon)")
-      .order("discount_percentage", { ascending: false })
-      .range(from, to);
-
-    if (excludeExpired) {
-      q = q.gte("expiry_date", new Date().toISOString().slice(0, 10));
-    }
-    const { data, error } = await q;
-    return { data: (data || []).map(transformProduct) as Product[], error };
-  },
-
-  async getProductById(id: string) {
-    const { data, error } = await supabase
-      .from("products")
-      .select("*, partners(name, logo_url), categories(name, icon)")
-      .eq("id", id)
-      .maybeSingle();
-    return { data: data ? transformProduct(data) : null, error };
-  },
-
-  async getByCategory(categoryId: string) {
-    const { data, error } = await supabase
-      .from("products")
-      .select("*, partners(name, logo_url), categories(name, icon)")
-      .eq("category_id", categoryId)
-      .order("discount_percentage", { ascending: false });
-    return { data: (data || []).map(transformProduct) as Product[], error };
-  },
-
-  async getByPartner(partnerId: string) {
-    const { data, error } = await supabase
-      .from("products")
-      .select("*, partners(name, logo_url), categories(name, icon)")
-      .eq("partner_id", partnerId);
-    return { data: (data || []).map(transformProduct) as Product[], error };
-  },
-
-  async search(query: string) {
-    const { data, error } = await supabase
-      .from("products")
-      .select("*, partners(name, logo_url), categories(name, icon)")
-      .ilike("name", `%${query}%`)
-      .limit(50);
-    return { data: (data || []).map(transformProduct) as Product[], error };
-  },
-};
-
-// ─── CATEGORIES ─────────────────────────────────────────────────────────────
-
-export const categoriesAPI = {
-  async getCategories() {
-    const { data, error } = await supabase
-      .from("categories")
-      .select("*")
-      .order("name");
-    return { data: (data || []).map(transformCategory) as Category[], error };
-  },
-};
-
-// ─── PARTNERS ───────────────────────────────────────────────────────────────
-
-export const partnersAPI = {
-  async getPartners() {
-    const { data, error } = await supabase
-      .from("partners")
-      .select("*")
-      .eq("status", "approved");
-    return { data: (data || []).map(transformPartner) as Partner[], error };
-  },
-
-  async getPartnerById(id: string) {
-    const { data, error } = await supabase
-      .from("partners")
-      .select("*")
-      .eq("id", id)
-      .maybeSingle();
-    return { data: data ? transformPartner(data) : null, error };
-  },
-};
-
-// ─── CONTENT (CMS-like) ─────────────────────────────────────────────────────
-
-export const contentAPI = {
-  async getTestimonials() {
-    const { data, error } = await supabase
-      .from("testimonials")
-      .select("*")
-      .order("created_at", { ascending: false });
-    return { data: data || [], error };
-  },
-  async getFaqs() {
-    const { data, error } = await supabase
-      .from("faqs")
-      .select("*")
-      .order("order_index", { ascending: true });
-    return {
-      data: (data || []).map((f: any) => ({ id: f.id, q: f.question, a: f.answer })),
-      error,
-    };
-  },
-  async getTips() {
-    const { data, error } = await supabase
-      .from("tips")
-      .select("*")
-      .order("created_at", { ascending: false });
-    return {
-      data: (data || []).map((t: any) => ({
-        id: t.id,
-        title: t.title,
-        excerpt: t.excerpt || "",
-        image: t.image_url || "",
-        readTime: t.read_time ? `${t.read_time} min read` : "",
-        content: t.content,
-      })),
-      error,
-    };
-  },
-  async getCountries() {
-    const { data, error } = await supabase
-      .from("countries")
-      .select("*")
-      .order("name");
-    return {
-      data: (data || []).map((c: any) => ({
-        code: c.code,
-        flag: c.flag_emoji || "",
-        name: c.name,
-        short: c.short_name || c.name,
-        live: c.is_live || false,
-      })),
-      error,
-    };
-  },
-  async getExpiryFilters() {
-    const { data, error } = await supabase
-      .from("expiry_filters")
-      .select("*")
-      .order("min_days", { ascending: true });
-    return {
-      data: (data || []).map((f: any) => ({
-        id: f.id,
-        label: f.label,
-        min: f.min_days ?? 0,
-        max: f.max_days ?? 9999,
-      })),
-      error,
-    };
-  },
-};
-
-// ─── AUTH / CUSTOMER ────────────────────────────────────────────────────────
-
-// Map a raw customers row (any shape) → app Customer type.
-// Be defensive about column names since the real schema only has: id, auth_user_id, email, name, created_at.
-function toCustomer(row: any): Customer | null {
-  if (!row) return null;
+const handleError = (error: any) => {
+  console.error("API Error:", error);
   return {
-    id: row.id,
-    authUserId: row.auth_user_id,
-    fullName: row.name || row.full_name || "",
-    email: row.email,
-    phone: row.phone || "",
-    countryCode: row.country_code || "",
+    data: null,
+    error: error?.message || "An error occurred",
   };
-}
+};
 
+/**
+ * PRODUCTS API
+ */
+export const productsAPI = {
+  getProducts: async (
+    options: {
+      category?: string;
+      minPrice?: number;
+      maxPrice?: number;
+      search?: string;
+      excludeExpired?: boolean;
+      from?: number;
+      to?: number;
+    } = {}
+  ) => {
+    try {
+      const {
+        category,
+        minPrice,
+        maxPrice,
+        search,
+        excludeExpired = true,
+        from = 0,
+        to = 19,
+      } = options;
+
+      let query = supabase
+        .from("products")
+        .select(
+          `
+          id,
+          name,
+          description,
+          original_price,
+          discounted_price,
+          discount_percentage,
+          image_url,
+          expiry_date,
+          stock,
+          category_id,
+          partner_id,
+          status,
+          rating,
+          sku,
+          created_at,
+          categories(id, name, icon),
+          partners(id, name, logo_url, initials, color, bg_color, accent_color)
+        `
+        )
+        .or("status.eq.published,status.is.null")
+        .order("created_at", { ascending: false });
+
+      if (category) query = query.eq("category_id", category);
+      if (minPrice !== undefined) query = query.gte("discounted_price", minPrice);
+      if (maxPrice !== undefined) query = query.lte("discounted_price", maxPrice);
+      if (excludeExpired) {
+        query = query.gt("expiry_date", new Date().toISOString().split("T")[0]);
+      }
+      if (search) {
+        query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`);
+      }
+
+      query = query.range(from, to);
+
+      const { data, error } = await query;
+      if (error) return handleError(error);
+      return { data, error: null };
+    } catch (error) {
+      return handleError(error);
+    }
+  },
+
+  getProduct: async (id: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("products")
+        .select(
+          `
+          *,
+          categories(id, name, icon),
+          partners(id, name, logo_url, domain, initials, color, bg_color, accent_color, email)
+        `
+        )
+        .eq("id", id)
+        .single();
+
+      if (error) return handleError(error);
+      return { data, error: null };
+    } catch (error) {
+      return handleError(error);
+    }
+  },
+
+  getFeaturedProducts: async (limit = 8) => {
+    try {
+      const { data, error } = await supabase
+        .from("products")
+        .select(
+          `
+          id,
+          name,
+          original_price,
+          discounted_price,
+          discount_percentage,
+          image_url,
+          expiry_date,
+          rating,
+          stock,
+          categories(name, icon),
+          partners(name, initials, color, bg_color)
+        `
+        )
+        .or("status.eq.published,status.is.null")
+        .gt("expiry_date", new Date().toISOString().split("T")[0])
+        .order("discount_percentage", { ascending: false })
+        .limit(limit);
+
+      if (error) return handleError(error);
+      return { data, error: null };
+    } catch (error) {
+      return handleError(error);
+    }
+  },
+
+  getProductsByCategory: async (categoryId: string, limit = 20) => {
+    try {
+      const { data, error } = await supabase
+        .from("products")
+        .select(
+          `
+          id,
+          name,
+          original_price,
+          discounted_price,
+          discount_percentage,
+          image_url,
+          expiry_date,
+          rating,
+          stock,
+          partners(name, initials, color, bg_color)
+        `
+        )
+        .eq("category_id", categoryId)
+        .or("status.eq.published,status.is.null")
+        .gt("expiry_date", new Date().toISOString().split("T")[0])
+        .order("created_at", { ascending: false })
+        .limit(limit);
+
+      if (error) return handleError(error);
+      return { data, error: null };
+    } catch (error) {
+      return handleError(error);
+    }
+  },
+};
+
+/**
+ * CATEGORIES API
+ */
+export const categoriesAPI = {
+  getCategories: async () => {
+    try {
+      const { data, error } = await supabase
+        .from("categories")
+        .select("id, name, icon, image_url, product_count, created_at")
+        .order("name", { ascending: true });
+
+      if (error) return handleError(error);
+      return { data, error: null };
+    } catch (error) {
+      return handleError(error);
+    }
+  },
+};
+
+/**
+ * PARTNERS API
+ */
+export const partnersAPI = {
+  getPartners: async () => {
+    try {
+      const { data, error } = await supabase
+        .from("partners")
+        .select(
+          `
+          id,
+          name,
+          type,
+          logo_url,
+          domain,
+          initials,
+          color,
+          bg_color,
+          accent_color,
+          status,
+          listed_products,
+          active_products
+        `
+        )
+        .eq("status", "active")
+        .order("name", { ascending: true });
+
+      if (error) return handleError(error);
+      return { data, error: null };
+    } catch (error) {
+      return handleError(error);
+    }
+  },
+
+  getPartner: async (id: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("partners")
+        .select(
+          `
+          *,
+          products(
+            id,
+            name,
+            original_price,
+            discounted_price,
+            discount_percentage,
+            image_url,
+            expiry_date,
+            rating,
+            stock
+          )
+        `
+        )
+        .eq("id", id)
+        .single();
+
+      if (error) return handleError(error);
+      return { data, error: null };
+    } catch (error) {
+      return handleError(error);
+    }
+  },
+};
+
+/**
+ * CART API (Requires Authentication)
+ */
+export const cartAPI = {
+  getCart: async () => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return handleError({ message: "Not authenticated" });
+
+      const { data: customer } = await supabase
+        .from("customers")
+        .select("id")
+        .eq("auth_user_id", user.id)
+        .maybeSingle();
+      if (!customer) return handleError({ message: "Customer profile not found" });
+
+      const { data, error } = await supabase
+        .from("cart_items")
+        .select(
+          `
+          id,
+          product_id,
+          quantity,
+          added_at,
+          products(
+            id,
+            name,
+            original_price,
+            discounted_price,
+            discount_percentage,
+            image_url,
+            stock,
+            expiry_date
+          )
+        `
+        )
+        .eq("customer_id", customer.id)
+        .order("added_at", { ascending: false });
+
+      if (error) return handleError(error);
+      return { data, error: null };
+    } catch (error) {
+      return handleError(error);
+    }
+  },
+
+  addToCart: async (productId: string, quantity = 1) => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return handleError({ message: "Not authenticated" });
+
+      const { data: customer } = await supabase
+        .from("customers")
+        .select("id")
+        .eq("auth_user_id", user.id)
+        .maybeSingle();
+      if (!customer) return handleError({ message: "Customer profile not found" });
+
+      // Check if product already in cart
+      const { data: existingItem } = await supabase
+        .from("cart_items")
+        .select("id, quantity")
+        .eq("customer_id", customer.id)
+        .eq("product_id", productId)
+        .maybeSingle();
+
+      if (existingItem) {
+        const { data, error } = await supabase
+          .from("cart_items")
+          .update({ quantity: existingItem.quantity + quantity })
+          .eq("id", existingItem.id)
+          .select();
+
+        if (error) return handleError(error);
+        return { data, error: null };
+      } else {
+        const { data, error } = await supabase
+          .from("cart_items")
+          .insert([{ customer_id: customer.id, product_id: productId, quantity }])
+          .select();
+
+        if (error) return handleError(error);
+        return { data, error: null };
+      }
+    } catch (error) {
+      return handleError(error);
+    }
+  },
+
+  updateCartQuantity: async (cartItemId: string, quantity: number) => {
+    try {
+      if (quantity <= 0) {
+        return cartAPI.removeFromCart(cartItemId);
+      }
+      const { data, error } = await supabase
+        .from("cart_items")
+        .update({ quantity })
+        .eq("id", cartItemId)
+        .select();
+
+      if (error) return handleError(error);
+      return { data, error: null };
+    } catch (error) {
+      return handleError(error);
+    }
+  },
+
+  removeFromCart: async (cartItemId: string) => {
+    try {
+      const { error } = await supabase
+        .from("cart_items")
+        .delete()
+        .eq("id", cartItemId);
+
+      if (error) return handleError(error);
+      return { data: { success: true }, error: null };
+    } catch (error) {
+      return handleError(error);
+    }
+  },
+
+  clearCart: async () => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return handleError({ message: "Not authenticated" });
+
+      const { data: customer } = await supabase
+        .from("customers")
+        .select("id")
+        .eq("auth_user_id", user.id)
+        .maybeSingle();
+      if (!customer) return handleError({ message: "Customer profile not found" });
+
+      const { error } = await supabase
+        .from("cart_items")
+        .delete()
+        .eq("customer_id", customer.id);
+
+      if (error) return handleError(error);
+      return { data: { success: true }, error: null };
+    } catch (error) {
+      return handleError(error);
+    }
+  },
+};
+
+/**
+ * ORDERS API (Requires Authentication)
+ */
+export const ordersAPI = {
+  createOrder: async (orderData: Record<string, any> = {}) => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return handleError({ message: "Not authenticated" });
+
+      const { data: customer } = await supabase
+        .from("customers")
+        .select("id, name, email, phone")
+        .eq("auth_user_id", user.id)
+        .maybeSingle();
+      if (!customer) return handleError({ message: "Customer profile not found" });
+
+      // Get cart items
+      const { data: cartItems, error: cartError } = await supabase
+        .from("cart_items")
+        .select("product_id, quantity, products(original_price, discounted_price, name)")
+        .eq("customer_id", customer.id);
+
+      if (cartError) return handleError(cartError);
+      if (!cartItems || cartItems.length === 0) {
+        return handleError({ message: "Cart is empty" });
+      }
+
+      const subtotal = cartItems.reduce(
+        (sum: number, item: any) =>
+          sum + (item.products.discounted_price || item.products.original_price) * item.quantity,
+        0
+      );
+
+      const { data: firstProduct } = await supabase
+        .from("products")
+        .select("partner_id")
+        .eq("id", cartItems[0].product_id)
+        .single();
+
+      const { data: order, error: orderError } = await supabase
+        .from("orders")
+        .insert([
+          {
+            customer_id: customer.id,
+            partner_id: firstProduct?.partner_id,
+            customer_name: customer.name,
+            customer_email: customer.email,
+            customer_phone: customer.phone,
+            item_count: cartItems.length,
+            subtotal,
+            total: subtotal,
+            order_status: "new",
+            payment_status: "pending",
+            ...orderData,
+          },
+        ])
+        .select()
+        .single();
+
+      if (orderError) return handleError(orderError);
+
+      const orderItems = cartItems.map((item: any) => ({
+        order_id: order.id,
+        product_id: item.product_id,
+        product_name: item.products.name,
+        quantity: item.quantity,
+        unit_price: item.products.discounted_price || item.products.original_price,
+        total_price: (item.products.discounted_price || item.products.original_price) * item.quantity,
+      }));
+
+      const { error: itemsError } = await supabase.from("order_items").insert(orderItems);
+      if (itemsError) return handleError(itemsError);
+
+      // Clear cart
+      await cartAPI.clearCart();
+
+      return { data: order, error: null };
+    } catch (error) {
+      return handleError(error);
+    }
+  },
+
+  getMyOrders: async () => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return handleError({ message: "Not authenticated" });
+
+      const { data: customer } = await supabase
+        .from("customers")
+        .select("id")
+        .eq("auth_user_id", user.id)
+        .maybeSingle();
+      if (!customer) return handleError({ message: "Customer profile not found" });
+
+      const { data, error } = await supabase
+        .from("orders")
+        .select(
+          `
+          id,
+          total,
+          order_status,
+          payment_status,
+          ordered_at,
+          delivery_address,
+          item_count,
+          order_items(
+            id,
+            product_id,
+            product_name,
+            quantity,
+            unit_price,
+            total_price,
+            products(name, image_url)
+          )
+        `
+        )
+        .eq("customer_id", customer.id)
+        .order("ordered_at", { ascending: false });
+
+      if (error) return handleError(error);
+      return { data, error: null };
+    } catch (error) {
+      return handleError(error);
+    }
+  },
+
+  getOrder: async (id: string) => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return handleError({ message: "Not authenticated" });
+
+      const { data: customer } = await supabase
+        .from("customers")
+        .select("id")
+        .eq("auth_user_id", user.id)
+        .maybeSingle();
+      if (!customer) return handleError({ message: "Customer profile not found" });
+
+      const { data, error } = await supabase
+        .from("orders")
+        .select(
+          `
+          *,
+          order_items(
+            id,
+            product_id,
+            product_name,
+            quantity,
+            unit_price,
+            total_price,
+            products(id, name, image_url, description)
+          )
+        `
+        )
+        .eq("id", id)
+        .eq("customer_id", customer.id)
+        .single();
+
+      if (error) return handleError(error);
+      return { data, error: null };
+    } catch (error) {
+      return handleError(error);
+    }
+  },
+};
+
+/**
+ * AUTH API
+ *
+ * NOTE: We rely on the DB trigger handle_new_user() (in supabase/v17_2_fixes.sql)
+ * to create the customers row on signup. We never insert into customers manually.
+ */
 export const authAPI = {
-  async getOrCreateCustomer(authUserId: string, fallbackEmail?: string, fallbackName?: string): Promise<Customer | null> {
-    // 1) Try by auth_user_id
-    const byAuth = await supabase
-      .from("customers")
-      .select("*")
-      .eq("auth_user_id", authUserId)
-      .maybeSingle();
-    if (byAuth.data) return toCustomer(byAuth.data);
+  signIn: async (email: string, password: string) => {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) return handleError(error);
+      return { data, error: null };
+    } catch (error) {
+      return handleError(error);
+    }
+  },
 
-    // 2) Maybe an older customer row exists with the same email but no auth_user_id link.
-    //    Adopt it by setting its auth_user_id, so future logins find it.
-    if (fallbackEmail) {
-      const byEmail = await supabase
+  signOut: async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) return handleError(error);
+      return { data: { success: true }, error: null };
+    } catch (error) {
+      return handleError(error);
+    }
+  },
+
+  getSession: async () => {
+    try {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) return handleError(error);
+      return { data, error: null };
+    } catch (error) {
+      return handleError(error);
+    }
+  },
+
+  getProfile: async () => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return handleError({ message: "Not authenticated" });
+
+      const { data, error } = await supabase
         .from("customers")
         .select("*")
-        .eq("email", fallbackEmail)
+        .eq("auth_user_id", user.id)
         .maybeSingle();
-      if (byEmail.data) {
-        // If it's already linked to another user, just return it (don't clobber).
-        // Otherwise, link this auth user to it.
-        if (!byEmail.data.auth_user_id) {
-          const linked = await supabase
-            .from("customers")
-            .update({ auth_user_id: authUserId })
-            .eq("id", byEmail.data.id)
-            .select()
-            .maybeSingle();
-          if (linked.data) return toCustomer(linked.data);
-        }
-        return toCustomer(byEmail.data);
-      }
+
+      if (error) return handleError(error);
+      return { data: data || null, error: null };
+    } catch (error) {
+      return handleError(error);
     }
-
-    // 3) Create new (using actual column name `name`, not `full_name`)
-    const { data: created } = await supabase
-      .from("customers")
-      .insert({
-        auth_user_id: authUserId,
-        email: fallbackEmail,
-        name: fallbackName,
-      })
-      .select()
-      .maybeSingle();
-    return toCustomer(created);
   },
 
-  async updateCustomer(customerId: string, patch: Partial<Customer>) {
-    const { data, error } = await supabase
-      .from("customers")
-      .update({
-        name: patch.fullName,
-        // phone / country_code intentionally omitted (columns may not exist)
-      })
-      .eq("id", customerId)
-      .select()
-      .maybeSingle();
-    return { data, error };
-  },
-};
+  updateProfile: async (updates: Record<string, any>) => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return handleError({ message: "Not authenticated" });
 
-// ─── CART ───────────────────────────────────────────────────────────────────
+      const { data, error } = await supabase
+        .from("customers")
+        .update(updates)
+        .eq("auth_user_id", user.id)
+        .select()
+        .single();
 
-export const cartAPI = {
-  async getCart(customerId: string) {
-    const { data, error } = await supabase
-      .from("cart_items")
-      .select("quantity, products(*, partners(name, logo_url), categories(name, icon))")
-      .eq("customer_id", customerId);
-    return {
-      data: (data || [])
-        .filter((r: any) => r.products)
-        .map((r: any) => ({
-          product: transformProduct(r.products),
-          qty: r.quantity,
-        })),
-      error,
-    };
-  },
-
-  async upsertItems(customerId: string, items: { product_id: string; quantity: number }[]) {
-    const rows = items.map((i) => ({
-      customer_id: customerId,
-      product_id: i.product_id,
-      quantity: i.quantity,
-    }));
-    const { data, error } = await supabase
-      .from("cart_items")
-      .upsert(rows, { onConflict: "customer_id,product_id" });
-    return { data, error };
-  },
-
-  async removeItem(customerId: string, productId: string) {
-    return supabase.from("cart_items").delete().match({ customer_id: customerId, product_id: productId });
-  },
-
-  async clear(customerId: string) {
-    return supabase.from("cart_items").delete().eq("customer_id", customerId);
-  },
-};
-
-// ─── ORDERS ─────────────────────────────────────────────────────────────────
-
-export const ordersAPI = {
-  // Match the web behavior: find orders by customer_id OR snapshot email,
-  // and order by updated_at (the actual timestamp column on this table).
-  async getOrders(customerId: string, customerEmail?: string): Promise<{ data: Order[]; error: any }> {
-    let q = supabase
-      .from("orders")
-      .select("*, order_items(*, products(*, partners(name)))");
-
-    if (customerEmail) {
-      q = q.or(`customer_id.eq.${customerId},customer_email.eq.${customerEmail}`);
-    } else {
-      q = q.eq("customer_id", customerId);
+      if (error) return handleError(error);
+      return { data, error: null };
+    } catch (error) {
+      return handleError(error);
     }
-
-    const { data, error } = await q.order("updated_at", { ascending: false });
-    return { data: (data || []).map(transformOrder), error };
-  },
-
-  async getOrder(orderId: string) {
-    const { data, error } = await supabase
-      .from("orders")
-      .select("*, order_items(*, products(*, partners(name)))")
-      .eq("id", orderId)
-      .maybeSingle();
-    return { data: data ? transformOrder(data) : null, error };
-  },
-
-  async createOrder(payload: {
-    customer_id: string;
-    customer_name?: string;
-    customer_email?: string;
-    customer_phone?: string;
-    subtotal: number;
-    delivery_fee: number;
-    total: number;
-    payment_method?: string;
-    voucher_code?: string;
-    items: { product_id: string; quantity: number; price: number }[];
-  }) {
-    // Insert order. Stick to a minimal set of columns that we know exist on the
-    // orders table (id, customer_id, customer_name, customer_email, customer_phone,
-    // total, order_status, updated_at). Extra fields are best-effort.
-    const insertRow: Record<string, any> = {
-      customer_id: payload.customer_id,
-      customer_name: payload.customer_name,
-      customer_email: payload.customer_email,
-      customer_phone: payload.customer_phone,
-      total: payload.total,
-      order_status: "confirmed",
-    };
-    // optional columns — Supabase silently ignores undefined values
-    if (payload.subtotal != null) insertRow.subtotal = payload.subtotal;
-    if (payload.delivery_fee != null) insertRow.delivery_fee = payload.delivery_fee;
-    if (payload.payment_method) insertRow.payment_method = payload.payment_method;
-    if (payload.voucher_code) insertRow.voucher_code = payload.voucher_code;
-
-    const { data: order, error: orderErr } = await supabase
-      .from("orders")
-      .insert(insertRow)
-      .select()
-      .single();
-    if (orderErr || !order) return { data: null, error: orderErr };
-
-    // Insert order items
-    const rows = payload.items.map((it) => ({
-      order_id: order.id,
-      product_id: it.product_id,
-      quantity: it.quantity,
-      price: it.price,
-    }));
-    const { error: itemsErr } = await supabase.from("order_items").insert(rows);
-    if (itemsErr) return { data: null, error: itemsErr };
-
-    return { data: order, error: null };
   },
 };
 
-// ─── SAVED / WISHLIST ───────────────────────────────────────────────────────
+/**
+ * CONTENT API
+ */
+export const contentAPI = {
+  getTestimonials: async () => {
+    try {
+      const { data, error } = await supabase
+        .from("testimonials")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) return handleError(error);
+      return { data, error: null };
+    } catch (error) {
+      return handleError(error);
+    }
+  },
+  getFaqs: async () => {
+    try {
+      const { data, error } = await supabase
+        .from("faqs")
+        .select("*")
+        .order("sort_order", { ascending: true });
+      if (error) return handleError(error);
+      return { data, error: null };
+    } catch (error) {
+      return handleError(error);
+    }
+  },
+  getTips: async () => {
+    try {
+      const { data, error } = await supabase
+        .from("tips")
+        .select("*")
+        .eq("published", true)
+        .order("created_at", { ascending: false });
+      if (error) return handleError(error);
+      return { data, error: null };
+    } catch (error) {
+      return handleError(error);
+    }
+  },
+  getCountries: async () => {
+    try {
+      const { data, error } = await supabase
+        .from("countries")
+        .select("*")
+        .order("name", { ascending: true });
+      if (error) return handleError(error);
+      return { data, error: null };
+    } catch (error) {
+      return handleError(error);
+    }
+  },
+  getExpiryFilters: async () => {
+    try {
+      const { data, error } = await supabase
+        .from("expiry_filters")
+        .select("*")
+        .order("id", { ascending: true });
+      if (error) return handleError(error);
+      return { data, error: null };
+    } catch (error) {
+      return handleError(error);
+    }
+  },
+};
 
+/**
+ * SAVED / WISHLIST — mobile-specific addition (web doesn't have this yet).
+ * Uses the saved_products table created earlier.
+ */
 export const savedAPI = {
-  async getSaved(customerId: string): Promise<{ data: string[]; error: any }> {
-    const { data, error } = await supabase
-      .from("saved_products")
-      .select("product_id")
-      .eq("customer_id", customerId);
-    return { data: (data || []).map((r: any) => String(r.product_id)), error };
+  getSaved: async () => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return { data: [], error: null };
+      const { data: customer } = await supabase
+        .from("customers")
+        .select("id")
+        .eq("auth_user_id", user.id)
+        .maybeSingle();
+      if (!customer) return { data: [], error: null };
+      const { data, error } = await supabase
+        .from("saved_products")
+        .select("product_id")
+        .eq("customer_id", customer.id);
+      if (error) return { data: [], error };
+      return { data: (data || []).map((r: any) => String(r.product_id)), error: null };
+    } catch (e) {
+      return { data: [], error: e };
+    }
   },
-  async add(customerId: string, productId: string) {
-    return supabase
-      .from("saved_products")
-      .insert({ customer_id: customerId, product_id: productId });
+  add: async (productId: string) => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { error: "Not authenticated" };
+    const { data: customer } = await supabase
+      .from("customers")
+      .select("id")
+      .eq("auth_user_id", user.id)
+      .maybeSingle();
+    if (!customer) return { error: "Customer profile not found" };
+    return supabase.from("saved_products").insert({ customer_id: customer.id, product_id: productId });
   },
-  async remove(customerId: string, productId: string) {
+  remove: async (productId: string) => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { error: "Not authenticated" };
+    const { data: customer } = await supabase
+      .from("customers")
+      .select("id")
+      .eq("auth_user_id", user.id)
+      .maybeSingle();
+    if (!customer) return { error: "Customer profile not found" };
     return supabase
       .from("saved_products")
       .delete()
-      .match({ customer_id: customerId, product_id: productId });
+      .match({ customer_id: customer.id, product_id: productId });
   },
 };

@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ordersAPI } from "../../lib/api";
+import { transformOrder } from "../../lib/transformers";
 import { supabase } from "../../lib/supabase";
 import type { Order } from "../../lib/types";
 
@@ -66,7 +67,7 @@ export default function OrderTracking() {
     const load = async () => {
       const { data } = await ordersAPI.getOrder(String(id));
       if (!abort) {
-        setOrder(data);
+        setOrder(data ? transformOrder(data) : null);
         setLoading(false);
       }
     };

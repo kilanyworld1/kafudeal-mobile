@@ -1,4 +1,4 @@
-import { Product, Category, Partner, Order } from "./types";
+import { Product, Category, Partner, Order, Customer } from "./types";
 
 function fmtEndsIn(expiryDate?: string | null) {
   if (!expiryDate) return "";
@@ -14,7 +14,9 @@ function fmtEndsIn(expiryDate?: string | null) {
   return `${Math.floor(days / 7)}w left`;
 }
 
+/** Bridge from raw Supabase row (snake_case) to mobile UI shape (camelCase + aliases). */
 export function transformProduct(p: any): Product {
+  if (!p) return null as any;
   const now = new Date();
   const expDate = p.expiry_date ? new Date(p.expiry_date) : null;
   const expiryDays = expDate
@@ -35,8 +37,8 @@ export function transformProduct(p: any): Product {
     discountedPrice: discounted,
     discountPercentage: discountPct,
     image: p.image_url || "",
-    store: p.partners?.name || p.partner_name || "VERIFIED STORE",
-    category: p.categories?.name || p.category_name || "",
+    store: p.partners?.name || "VERIFIED STORE",
+    category: p.categories?.name || "",
     categoryId: p.category_id,
     partnerId: p.partner_id,
     expiryDays,
@@ -45,7 +47,7 @@ export function transformProduct(p: any): Product {
     rating: Number(p.rating) || 0,
     sku: p.sku,
     status: p.status,
-    // aliases for the v2 UI
+    // UI aliases
     price: discounted,
     was: original,
     discount: discountPct,
@@ -81,20 +83,48 @@ export function transformPartner(p: any): Partner {
   };
 }
 
+export function transformCustomer(c: any): Customer | null {
+  if (!c) return null;
+  return {
+    id: c.id,
+    authUserId: c.auth_user_id,
+    fullName: c.name || "",
+    email: c.email || "",
+    phone: c.phone || "",
+    countryCode: c.country_code || "",
+  };
+}
+
+/**
+ * Match the orders rows returned by web's getMyOrders / getOrder:
+ *   { id, total, order_status, payment_status, ordered_at, delivery_address,
+ *     item_count, order_items: [{ product_name, quantity, unit_price, total_price, products: {name, image_url} }] }
+ */
 export function transformOrder(o: any): Order {
   return {
     id: String(o.id),
-    // Real orders table doesn't have a short_id column — derive one from the UUID
-    shortId: o.short_id || String(o.id).slice(0, 8).toUpperCase(),
-    status: o.order_status || o.status || "pending",
-    // Use updated_at (created_at doesn't exist on the orders table)
-    createdAt: o.updated_at || o.created_at,
+    // No short_id column on the real schema — derive a short label from the UUID
+    shortId: String(o.id).slice(0, 8).toUpperCase(),
+    status: o.order_status || "new",
+    // Real timestamp column is ordered_at
+    createdAt: o.ordered_at,
     total: Number(o.total) || 0,
-    itemsCount: o.items_count || (o.order_items?.length ?? 0),
-    items: o.order_items?.map((oi: any) => ({
-      product: oi.products ? transformProduct(oi.products) : ({} as Product),
+    itemsCount: o.item_count ?? o.order_items?.length ?? 0,
+    items: (o.order_items || []).map((oi: any) => ({
+      product: oi.products
+        ? transformProduct({
+            id: oi.products.id ?? oi.product_id,
+            name: oi.products.name ?? oi.product_name,
+            image_url: oi.products.image_url,
+            description: oi.products.description,
+          })
+        : ({
+            id: oi.product_id,
+            name: oi.product_name,
+            image: "",
+          } as any),
       qty: oi.quantity,
-      price: Number(oi.price) || 0,
+      price: Number(oi.unit_price) || 0,
     })),
   };
 }

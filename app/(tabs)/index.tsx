@@ -8,6 +8,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useFocusEffect } from "expo-router";
 import { productsAPI, categoriesAPI } from "../../lib/api";
+import { transformProduct, transformCategory } from "../../lib/transformers";
 import type { Product, Category } from "../../lib/types";
 import { useAuth } from "../../lib/auth-context";
 import { categories as STATIC_CATS } from "../../data/products";
@@ -64,8 +65,8 @@ export default function Home() {
       productsAPI.getProducts({ from: 0, to: 60, excludeExpired: true }),
       categoriesAPI.getCategories(),
     ]);
-    setProducts(prods);
-    setLiveCategories(cats);
+    setProducts((prods || []).map(transformProduct));
+    setLiveCategories((cats || []).map(transformCategory));
   }, []);
 
   // Initial fetch

@@ -3,7 +3,11 @@ import { View, Text, Image, Animated, StyleSheet, Platform } from "react-native"
 import { Ionicons } from "@expo/vector-icons";
 import type { Product, CartItem } from "./types";
 import { cartAPI, savedAPI } from "./api";
+import { transformProduct } from "./transformers";
 import { useAuth } from "./auth-context";
+
+// Local cart row tracks the server-side cart_items.id so we can update/delete by row id.
+type LocalCartItem = CartItem & { cartItemId?: string };
 
 type Toast = {
   id: number;
@@ -13,7 +17,7 @@ type Toast = {
 };
 
 type CartContextValue = {
-  items: CartItem[];
+  items: LocalCartItem[];
   count: number;
   subtotal: number;
   add: (p: Product) => void;
@@ -31,12 +35,11 @@ const CartContext = createContext<CartContextValue | null>(null);
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const { customer } = useAuth();
-  const [items, setItems] = useState<CartItem[]>([]);
+  const [items, setItems] = useState<LocalCartItem[]>([]);
   const [saved, setSaved] = useState<string[]>([]);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const badgeScale = useRef(new Animated.Value(1)).current;
   const toastId = useRef(0);
-  const lastMergedCustomerId = useRef<string | null>(null);
 
   const bump = () => {
     Animated.sequence([
@@ -52,93 +55,106 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setTimeout(() => setToasts((prev) => prev.filter((x) => x.id !== id)), 2200);
   }, []);
 
-  // Merge cart + load saved when signing in
+  // Server cart is the source of truth (matches web). Load it when the user changes.
+  const refreshCart = useCallback(async () => {
+    if (!customer?.id) return;
+    const { data, error } = await cartAPI.getCart();
+    if (error || !data) return;
+    const mapped: LocalCartItem[] = (data as any[])
+      .filter((r) => r.products)
+      .map((r) => ({
+        cartItemId: r.id,
+        product: transformProduct(r.products),
+        qty: r.quantity,
+      }));
+    setItems(mapped);
+  }, [customer?.id]);
+
   useEffect(() => {
     if (!customer?.id) {
-      lastMergedCustomerId.current = null;
+      setItems([]);
+      setSaved([]);
       return;
     }
-    if (lastMergedCustomerId.current === customer.id) return;
-    lastMergedCustomerId.current = customer.id;
-
+    let cancelled = false;
     (async () => {
-      try {
-        // Upload local cart, then re-read server cart
-        if (items.length > 0) {
-          await cartAPI.upsertItems(
-            customer.id,
-            items.map((it) => ({ product_id: it.product.id, quantity: it.qty }))
+      await refreshCart();
+      const { data: savedIds } = await savedAPI.getSaved();
+      if (!cancelled) setSaved(savedIds);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [customer?.id, refreshCart]);
+
+  const add = useCallback(
+    async (p: Product) => {
+      // Optimistic UI
+      setItems((prev) => {
+        const existing = prev.find((it) => it.product.id === p.id);
+        if (existing) {
+          return prev.map((it) =>
+            it.product.id === p.id ? { ...it, qty: Math.min(it.qty + 1, p.stock || 999) } : it
           );
         }
-        const { data: serverItems } = await cartAPI.getCart(customer.id);
-        if (serverItems.length > 0) setItems(serverItems);
+        return [...prev, { product: p, qty: 1 }];
+      });
+      bump();
+      showToast({ product: p, message: "Added to cart", kind: "cart" });
 
-        const { data: savedIds } = await savedAPI.getSaved(customer.id);
-        setSaved(savedIds);
-      } catch (e) {
-        console.warn("Cart/saved sync failed:", e);
+      if (customer?.id) {
+        await cartAPI.addToCart(p.id, 1);
+        await refreshCart(); // pick up cartItemId after server insert
       }
-    })();
-  }, [customer?.id]);
+    },
+    [customer?.id, showToast, refreshCart]
+  );
 
-  const persistCart = useCallback((nextItems: CartItem[]) => {
-    if (!customer?.id) return;
-    cartAPI.upsertItems(
-      customer.id,
-      nextItems.map((it) => ({ product_id: it.product.id, quantity: it.qty }))
-    ).catch((e) => console.warn("cart upsert failed", e));
-  }, [customer?.id]);
+  const remove = useCallback(
+    async (productId: string) => {
+      const target = items.find((it) => it.product.id === productId);
+      setItems((prev) => prev.filter((it) => it.product.id !== productId));
+      if (customer?.id && target?.cartItemId) {
+        await cartAPI.removeFromCart(target.cartItemId);
+      }
+    },
+    [items, customer?.id]
+  );
 
-  const add = useCallback((p: Product) => {
-    setItems((prev) => {
-      const existing = prev.find((it) => it.product.id === p.id);
-      const next = existing
-        ? prev.map((it) => (it.product.id === p.id ? { ...it, qty: Math.min(it.qty + 1, p.stock || 999) } : it))
-        : [...prev, { product: p, qty: 1 }];
-      persistCart(next);
-      return next;
-    });
-    bump();
-    showToast({ product: p, message: "Added to cart", kind: "cart" });
-  }, [persistCart, showToast]);
+  const setQty = useCallback(
+    async (productId: string, qty: number) => {
+      if (qty <= 0) {
+        remove(productId);
+        return;
+      }
+      const target = items.find((it) => it.product.id === productId);
+      setItems((prev) => prev.map((it) => (it.product.id === productId ? { ...it, qty } : it)));
+      if (customer?.id && target?.cartItemId) {
+        await cartAPI.updateCartQuantity(target.cartItemId, qty);
+      }
+    },
+    [items, customer?.id, remove]
+  );
 
-  const remove = useCallback((id: string) => {
-    setItems((prev) => {
-      const next = prev.filter((it) => it.product.id !== id);
-      if (customer?.id) cartAPI.removeItem(customer.id, id).catch(() => {});
-      return next;
-    });
-  }, [customer?.id]);
-
-  const setQty = useCallback((id: string, qty: number) => {
-    if (qty <= 0) {
-      remove(id);
-      return;
-    }
-    setItems((prev) => {
-      const next = prev.map((it) => (it.product.id === id ? { ...it, qty } : it));
-      persistCart(next);
-      return next;
-    });
-  }, [remove, persistCart]);
-
-  const clear = useCallback(() => {
+  const clear = useCallback(async () => {
     setItems([]);
-    if (customer?.id) cartAPI.clear(customer.id).catch(() => {});
+    if (customer?.id) await cartAPI.clearCart();
   }, [customer?.id]);
 
-  const toggleSaved = useCallback((id: string, name?: string) => {
-    setSaved((prev) => {
-      if (prev.includes(id)) {
-        if (customer?.id) savedAPI.remove(customer.id, id).catch(() => {});
+  const toggleSaved = useCallback(
+    async (id: string, name?: string) => {
+      const wasSaved = saved.includes(id);
+      setSaved((prev) => (wasSaved ? prev.filter((x) => x !== id) : [...prev, id]));
+      if (wasSaved) {
         showToast({ message: "Removed from saved", kind: "info" });
-        return prev.filter((x) => x !== id);
+        if (customer?.id) await savedAPI.remove(id);
+      } else {
+        showToast({ message: name ? `${name} saved` : "Saved", kind: "save" });
+        if (customer?.id) await savedAPI.add(id);
       }
-      if (customer?.id) savedAPI.add(customer.id, id).catch(() => {});
-      showToast({ message: name ? `${name} saved` : "Saved", kind: "save" });
-      return [...prev, id];
-    });
-  }, [customer?.id, showToast]);
+    },
+    [saved, customer?.id, showToast]
+  );
 
   const isSaved = useCallback((id: string) => saved.includes(id), [saved]);
 
@@ -148,10 +164,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
   return (
     <CartContext.Provider
       value={{
-        items, count, subtotal,
-        add, remove, setQty, clear,
+        items,
+        count,
+        subtotal,
+        add,
+        remove,
+        setQty,
+        clear,
         badgeScale,
-        saved, toggleSaved, isSaved,
+        saved,
+        toggleSaved,
+        isSaved,
         showToast,
       }}
     >
@@ -205,12 +228,20 @@ function ToastItem({ toast, index }: { toast: Toast; index: number }) {
         <Image source={{ uri: toast.product.image }} style={ts.img} />
       ) : (
         <View style={[ts.iconWrap, { backgroundColor: iconBg }]}>
-          <Ionicons name={toast.kind === "save" ? "heart" : "checkmark-circle"} size={20} color={iconColor} />
+          <Ionicons
+            name={toast.kind === "save" ? "heart" : "checkmark-circle"}
+            size={20}
+            color={iconColor}
+          />
         </View>
       )}
       <View style={{ flex: 1 }}>
         <Text style={[ts.title, { color: textColor }]}>{toast.message}</Text>
-        {toast.product && <Text style={ts.sub} numberOfLines={1}>{toast.product.name}</Text>}
+        {toast.product && (
+          <Text style={ts.sub} numberOfLines={1}>
+            {toast.product.name}
+          </Text>
+        )}
       </View>
       {toast.kind === "cart" && (
         <View style={ts.checkBadge}>
@@ -222,32 +253,36 @@ function ToastItem({ toast, index }: { toast: Toast; index: number }) {
 }
 
 const ts = StyleSheet.create({
-  stack: {
-    position: "absolute", top: 0, left: 12, right: 12,
-    zIndex: 9999, elevation: 9999,
-  },
+  stack: { position: "absolute", top: 0, left: 12, right: 12, zIndex: 9999, elevation: 9999 },
   toast: {
-    position: "absolute", left: 0, right: 0,
-    flexDirection: "row", alignItems: "center", gap: 12,
-    paddingVertical: 10, paddingHorizontal: 12,
+    position: "absolute",
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     borderRadius: 14,
-    shadowColor: "#0F172A", shadowOpacity: 0.18,
-    shadowOffset: { width: 0, height: 10 }, shadowRadius: 24,
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.18,
+    shadowOffset: { width: 0, height: 10 },
+    shadowRadius: 24,
     elevation: 12,
     borderWidth: Platform.OS === "android" ? 0.5 : 0,
     borderColor: "rgba(15,23,42,0.06)",
   },
   img: { width: 44, height: 44, borderRadius: 10 },
-  iconWrap: {
-    width: 44, height: 44, borderRadius: 22,
-    alignItems: "center", justifyContent: "center",
-  },
+  iconWrap: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
   title: { fontSize: 14, fontWeight: "800" },
   sub: { fontSize: 12, color: "#64748B", marginTop: 2 },
   checkBadge: {
-    width: 26, height: 26, borderRadius: 13,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     backgroundColor: "#16A34A",
-    alignItems: "center", justifyContent: "center",
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
 

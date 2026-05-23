@@ -50,22 +50,11 @@ export default function Checkout() {
     }
 
     setPlacing(true);
+    // Web's createOrder reads cart_items from server and snapshots the
+    // customer info itself. We only pass the extra fields (payment, voucher).
     const { data, error } = await ordersAPI.createOrder({
-      customer_id: customer.id,
-      // Snapshot customer info on the order (matches web behavior)
-      customer_name: customer.fullName,
-      customer_email: customer.email,
-      customer_phone: customer.phone,
-      subtotal,
-      delivery_fee: delivery,
-      total,
       payment_method: payments.find((p) => p.id === pay)?.label || "Card",
       voucher_code: vApplied ? voucher : undefined,
-      items: items.map((it) => ({
-        product_id: it.product.id,
-        quantity: it.qty,
-        price: it.product.discountedPrice,
-      })),
     });
     setPlacing(false);
 

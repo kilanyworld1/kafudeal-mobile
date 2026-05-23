@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useFocusEffect } from "expo-router";
 import { ordersAPI } from "../../lib/api";
+import { transformOrder } from "../../lib/transformers";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../lib/auth-context";
 import type { Order } from "../../lib/types";
@@ -34,10 +35,9 @@ export default function Orders() {
       setOrders([]);
       return;
     }
-    // Match by customer_id OR customer_email so we catch orders attached either way
-    const { data } = await ordersAPI.getOrders(customer.id, customer.email);
-    setOrders(data);
-  }, [customer?.id, customer?.email]);
+    const { data } = await ordersAPI.getMyOrders();
+    setOrders((data || []).map(transformOrder));
+  }, [customer?.id]);
 
   useEffect(() => {
     (async () => {

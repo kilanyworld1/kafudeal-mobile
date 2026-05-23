@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { productsAPI } from "../../lib/api";
+import { transformProduct } from "../../lib/transformers";
 import type { Product } from "../../lib/types";
 import { useCart } from "../../lib/cart-context";
 
@@ -21,8 +22,8 @@ export default function ProductDetail() {
     if (!id) return;
     (async () => {
       setLoading(true);
-      const { data } = await productsAPI.getProductById(String(id));
-      setProduct(data);
+      const { data } = await productsAPI.getProduct(String(id));
+      setProduct(data ? transformProduct(data) : null);
       setLoading(false);
     })();
   }, [id]);

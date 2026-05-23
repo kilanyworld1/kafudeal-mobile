@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { productsAPI } from "../lib/api";
+import { transformProduct } from "../lib/transformers";
 import type { Product } from "../lib/types";
 
 const recents = ["Lindt chocolate", "Milk 2L", "Sourdough", "Cheese"];
@@ -61,8 +62,8 @@ export default function Search() {
     }
     setSearching(true);
     debounce.current = setTimeout(async () => {
-      const { data } = await productsAPI.search(q.trim());
-      setResults(data);
+      const { data } = await productsAPI.getProducts({ search: q.trim(), from: 0, to: 49 });
+      setResults((data || []).map(transformProduct));
       setSearching(false);
     }, 300);
     return () => clearTimeout(debounce.current);
