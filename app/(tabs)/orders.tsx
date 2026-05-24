@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { View, Text, ScrollView, Pressable, Image, StyleSheet, ActivityIndicator, RefreshControl } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -29,14 +29,16 @@ export default function Orders() {
   const [loading, setLoading] = useState(false);
 
   const [refreshing, setRefreshing] = useState(false);
+  const lastFetchRef = useRef(0);
 
   const fetchOrders = useCallback(async () => {
     if (!customer?.id) {
       setOrders([]);
       return;
     }
-    const { data } = await ordersAPI.getMyOrders();
+    const { data } = await ordersAPI.getMyOrders({ from: 0, to: 49 });
     setOrders((data || []).map(transformOrder));
+    lastFetchRef.current = Date.now();
   }, [customer?.id]);
 
   useEffect(() => {
@@ -47,7 +49,15 @@ export default function Orders() {
     })();
   }, [fetchOrders]);
 
-  useFocusEffect(useCallback(() => { fetchOrders(); }, [fetchOrders]));
+  // Refetch on focus, but skip if we fetched within the last 10 seconds
+  // (so flipping between tabs doesn't hammer the API)
+  useFocusEffect(
+    useCallback(() => {
+      if (Date.now() - lastFetchRef.current > 10000) {
+        fetchOrders();
+      }
+    }, [fetchOrders])
+  );
 
   // Realtime: refetch when ANY of this customer's orders change
   useEffect(() => {

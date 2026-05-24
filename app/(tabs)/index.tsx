@@ -79,10 +79,13 @@ export default function Home() {
     })();
   }, [fetchAll]);
 
-  // Refetch every time the user navigates back to this tab
+  // Refetch on focus but throttled — skip if we fetched < 10s ago
+  const lastFetchRef = useRef(0);
   useFocusEffect(
     useCallback(() => {
-      fetchAll();
+      if (Date.now() - lastFetchRef.current > 10000) {
+        fetchAll().then(() => { lastFetchRef.current = Date.now(); });
+      }
     }, [fetchAll])
   );
 

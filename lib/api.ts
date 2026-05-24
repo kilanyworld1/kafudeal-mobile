@@ -496,8 +496,9 @@ export const ordersAPI = {
     }
   },
 
-  getMyOrders: async () => {
+  getMyOrders: async (opts: { from?: number; to?: number } = {}) => {
     try {
+      const { from = 0, to = 49 } = opts;
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -533,7 +534,9 @@ export const ordersAPI = {
         `
         )
         .eq("customer_id", customer.id)
-        .order("ordered_at", { ascending: false });
+        .order("ordered_at", { ascending: false })
+        // Always cap the fetch so this scales when you have many orders
+        .range(from, to);
 
       if (error) return handleError(error);
       return { data, error: null };

@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator, RefreshControl } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -33,7 +33,14 @@ export default function Deals() {
     })();
   }, [fetchAll]);
 
-  useFocusEffect(useCallback(() => { fetchAll(); }, [fetchAll]));
+  const lastFetchRef = useRef(0);
+  useFocusEffect(
+    useCallback(() => {
+      if (Date.now() - lastFetchRef.current > 10000) {
+        fetchAll().then(() => { lastFetchRef.current = Date.now(); });
+      }
+    }, [fetchAll])
+  );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);

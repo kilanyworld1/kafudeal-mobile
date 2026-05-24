@@ -14,6 +14,7 @@ export default function ProductDetail() {
   const { add, toggleSaved, isSaved } = useCart();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const heartScale = useRef(new Animated.Value(1)).current;
   const addScale = useRef(new Animated.Value(1)).current;
@@ -22,7 +23,9 @@ export default function ProductDetail() {
     if (!id) return;
     (async () => {
       setLoading(true);
-      const { data } = await productsAPI.getProduct(String(id));
+      setFetchError(null);
+      const { data, error } = await productsAPI.getProduct(String(id));
+      if (error) setFetchError(typeof error === "string" ? error : (error as any)?.message || "Unknown error");
       setProduct(data ? transformProduct(data) : null);
       setLoading(false);
     })();
@@ -64,6 +67,14 @@ export default function ProductDetail() {
         <Text style={{ color: "#0F172A", fontSize: 16, marginTop: 12, fontWeight: "800" }}>
           Product not found
         </Text>
+        <Text style={{ color: "#64748B", fontSize: 11, marginTop: 6 }}>
+          id: {String(id)}
+        </Text>
+        {fetchError && (
+          <Text style={{ color: "#DC2626", fontSize: 12, marginTop: 6, textAlign: "center", paddingHorizontal: 24 }}>
+            {fetchError}
+          </Text>
+        )}
         <Pressable onPress={() => router.back()} style={s.backCta}>
           <Text style={s.backCtaText}>Go back</Text>
         </Pressable>
