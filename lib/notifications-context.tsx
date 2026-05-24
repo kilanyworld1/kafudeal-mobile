@@ -66,7 +66,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       .channel(`notif-${customer.id}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "notifications", filter: `customer_id=eq.${customer.id}` },
+        { event: "*", schema: "public", table: "customer_notifications", filter: `customer_id=eq.${customer.id}` },
         () => refresh()
       )
       .subscribe();

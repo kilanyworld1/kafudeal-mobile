@@ -1,9 +1,11 @@
--- KafuDeal v8: notifications system
+-- KafuDeal v8: customer notifications system
 -- Run once in Supabase SQL editor before installing the v8 app build.
+-- Note: We use the table name `customer_notifications` to avoid collision
+-- with an existing admin-side `notifications` table.
 
--- 1. notifications table -------------------------------------------------------
+-- 1. customer_notifications table ---------------------------------------------
 
-create table if not exists notifications (
+create table if not exists customer_notifications (
   id uuid primary key default gen_random_uuid(),
   customer_id uuid not null references customers(id) on delete cascade,
   type text not null,
@@ -15,11 +17,11 @@ create table if not exists notifications (
   created_at timestamptz not null default now()
 );
 
-create index if not exists notifications_customer_created_idx
-  on notifications(customer_id, created_at desc);
+create index if not exists customer_notifications_customer_created_idx
+  on customer_notifications(customer_id, created_at desc);
 
-create index if not exists notifications_customer_unread_idx
-  on notifications(customer_id) where read = false;
+create index if not exists customer_notifications_customer_unread_idx
+  on customer_notifications(customer_id) where read = false;
 
 -- 2. Trigger: order placed -----------------------------------------------------
 
@@ -33,7 +35,7 @@ begin
   if new.customer_id is null then
     return new;
   end if;
-  insert into notifications (customer_id, type, title, body, related_id, related_type)
+  insert into customer_notifications (customer_id, type, title, body, related_id, related_type)
   values (
     new.customer_id,
     'order_placed',
@@ -103,7 +105,7 @@ begin
       v_body  := 'Status changed to ' || new.order_status::text;
   end case;
 
-  insert into notifications (customer_id, type, title, body, related_id, related_type)
+  insert into customer_notifications (customer_id, type, title, body, related_id, related_type)
   values (
     new.customer_id,
     'order_status_' || new.order_status::text,
@@ -123,18 +125,18 @@ create trigger trg_notify_on_order_status_change
 
 -- 4. RLS — customers only see and update their own notifications --------------
 
-alter table notifications enable row level security;
+alter table customer_notifications enable row level security;
 
-drop policy if exists "notifications_select_own" on notifications;
-create policy "notifications_select_own" on notifications
+drop policy if exists "customer_notifications_select_own" on customer_notifications;
+create policy "customer_notifications_select_own" on customer_notifications
   for select using (
     customer_id in (
       select id from customers where auth_user_id = auth.uid()
     )
   );
 
-drop policy if exists "notifications_update_own" on notifications;
-create policy "notifications_update_own" on notifications
+drop policy if exists "customer_notifications_update_own" on customer_notifications;
+create policy "customer_notifications_update_own" on customer_notifications
   for update using (
     customer_id in (
       select id from customers where auth_user_id = auth.uid()
@@ -148,21 +150,21 @@ create policy "notifications_update_own" on notifications
 -- Inserts only happen via the SECURITY DEFINER triggers above, so no INSERT
 -- policy is needed (and we explicitly don't want clients writing directly).
 
--- 5. Realtime — add notifications to the supabase_realtime publication --------
+-- 5. Realtime — add customer_notifications to the supabase_realtime publication
 
 do $$
 begin
   if not exists (
     select 1 from pg_publication_tables
-    where pubname = 'supabase_realtime' and tablename = 'notifications'
+    where pubname = 'supabase_realtime' and tablename = 'customer_notifications'
   ) then
-    execute 'alter publication supabase_realtime add table notifications';
+    execute 'alter publication supabase_realtime add table customer_notifications';
   end if;
 end$$;
 
 -- 6. Sanity check -------------------------------------------------------------
 
 select
-  (select count(*) from notifications) as existing_rows,
+  (select count(*) from customer_notifications) as existing_rows,
   (select count(*) from pg_trigger where tgrelid = 'orders'::regclass
     and tgname in ('trg_notify_on_order_placed','trg_notify_on_order_status_change')) as triggers_installed;

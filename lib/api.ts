@@ -749,7 +749,7 @@ export const notificationsAPI = {
         .maybeSingle();
       if (!customer) return { data: [], error: null };
       const { data, error } = await supabase
-        .from("notifications")
+        .from("customer_notifications")
         .select("*")
         .eq("customer_id", customer.id)
         .order("created_at", { ascending: false })
@@ -772,7 +772,7 @@ export const notificationsAPI = {
         .maybeSingle();
       if (!customer) return { data: 0, error: null };
       const { count, error } = await supabase
-        .from("notifications")
+        .from("customer_notifications")
         .select("id", { count: "exact", head: true })
         .eq("customer_id", customer.id)
         .eq("read", false);
@@ -786,7 +786,7 @@ export const notificationsAPI = {
   markRead: async (id: string) => {
     try {
       const { error } = await supabase
-        .from("notifications")
+        .from("customer_notifications")
         .update({ read: true })
         .eq("id", id);
       if (error) return handleError(error);
@@ -807,7 +807,7 @@ export const notificationsAPI = {
         .maybeSingle();
       if (!customer) return handleError({ message: "Customer profile not found" });
       const { error } = await supabase
-        .from("notifications")
+        .from("customer_notifications")
         .update({ read: true })
         .eq("customer_id", customer.id)
         .eq("read", false);
