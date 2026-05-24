@@ -103,7 +103,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
       showToast({ product: p, message: "Added to cart", kind: "cart" });
 
       if (customer?.id) {
-        await cartAPI.addToCart(p.id, 1);
+        const res = await cartAPI.addToCart(p.id, 1);
+        if (res?.error) {
+          console.warn("addToCart failed:", res.error);
+          showToast({ message: "Couldn't sync cart to server", kind: "info" });
+        }
         await refreshCart(); // pick up cartItemId after server insert
       }
     },

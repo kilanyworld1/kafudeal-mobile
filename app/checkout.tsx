@@ -59,7 +59,14 @@ export default function Checkout() {
     setPlacing(false);
 
     if (error || !data) {
-      Alert.alert("Couldn't place order", (error as any)?.message || "Please try again.");
+      // `error` from the web-style API is already a string (from handleError).
+      // Older callers might pass an Error object — handle both.
+      const msg =
+        typeof error === "string"
+          ? error
+          : (error as any)?.message || (error as any)?.details || "Please try again.";
+      Alert.alert("Couldn't place order", msg);
+      console.warn("createOrder failed:", error);
       return;
     }
 
