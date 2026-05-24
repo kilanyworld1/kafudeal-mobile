@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, Pressable, Image, StyleSheet } from "react-native";
+import { View, Text, ScrollView, Pressable, Image, StyleSheet, Linking } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
@@ -49,6 +49,10 @@ export default function Account() {
     { icon: "settings", iconBg: "#F1F5F9", iconColor: "#334155",
       label: "Settings", route: "/settings" },
   ];
+
+  const openIG = () => {
+    Linking.openURL("https://www.instagram.com/kafudeal").catch(() => {});
+  };
 
   return (
     <View style={s.root}>
@@ -129,6 +133,18 @@ export default function Account() {
           ))}
         </View>
 
+        {/* Follow us on Instagram */}
+        <Pressable onPress={openIG} style={s.igCard}>
+          <View style={s.igIcon}>
+            <Ionicons name="logo-instagram" size={20} color="white" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.igTitle}>Follow us on Instagram</Text>
+            <Text style={s.igSub}>@kafudeal · Daily drops, behind the scenes</Text>
+          </View>
+          <Ionicons name="open-outline" size={18} color="#FF6B2C" />
+        </Pressable>
+
         {/* Sign in / Sign out */}
         {isLoggedIn && (
           <Pressable
@@ -139,7 +155,7 @@ export default function Account() {
           </Pressable>
         )}
 
-        <Text style={s.versionText}>KafuDeal v0.2.0 · UAE</Text>
+        <Text style={s.versionText}>KafuDeal v0.4.0 · UAE</Text>
       </ScrollView>
     </View>
   );
@@ -205,6 +221,21 @@ const s = StyleSheet.create({
   },
   menuLabel: { flex: 1, fontSize: 14, fontWeight: "700", color: "#0F172A" },
   menuMeta: { fontSize: 11.5, color: "#94A3B8", marginRight: 6 },
+  igCard: {
+    marginHorizontal: 16, marginTop: 18,
+    backgroundColor: "white", borderRadius: 14,
+    paddingHorizontal: 14, paddingVertical: 12,
+    flexDirection: "row", alignItems: "center", gap: 12,
+    borderWidth: 1, borderColor: "rgba(255,107,44,0.18)",
+  },
+  igIcon: {
+    width: 38, height: 38, borderRadius: 10,
+    alignItems: "center", justifyContent: "center",
+    // Instagram-ish gradient feel via solid orange (RN solid stay simple)
+    backgroundColor: "#E1306C",
+  },
+  igTitle: { fontSize: 14, fontWeight: "800", color: "#0F172A" },
+  igSub: { fontSize: 11.5, color: "#64748B", marginTop: 2 },
   signOutBtn: {
     marginHorizontal: 16, marginTop: 18,
     backgroundColor: "white",

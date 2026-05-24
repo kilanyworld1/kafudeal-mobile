@@ -13,6 +13,7 @@ import type { Product, Category } from "../../lib/types";
 import { useAuth } from "../../lib/auth-context";
 import { categories as STATIC_CATS } from "../../data/products";
 import ProductCard from "../../components/ProductCard";
+import HeaderIconButton from "../../components/HeaderIconButton";
 
 const PHRASES = [
   "Try 'chocolate'",
@@ -155,18 +156,28 @@ export default function Home() {
         ]}
       >
         <View style={s.stickyTopRow}>
-          <Pressable onPress={() => router.push("/addresses")} style={s.stickyLoc}>
+          <Pressable onPress={() => router.push("/addresses")} style={s.stickyLoc} hitSlop={8}>
             <Ionicons name="location-sharp" size={14} color="#FF6B2C" />
             <Text style={s.stickyLocText}>Dubai Marina · JLT</Text>
           </Pressable>
-          <View style={{ flexDirection: "row", gap: 6 }}>
-            <Pressable onPress={() => router.push("/saved")} style={s.stickyIconBtn}>
-              <Ionicons name="heart-outline" size={18} color="#0F172A" />
-            </Pressable>
-            <Pressable onPress={() => router.push("/notifications")} style={s.stickyIconBtn}>
-              <Ionicons name="notifications-outline" size={18} color="#0F172A" />
-              <View style={s.stickyDot} />
-            </Pressable>
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            <HeaderIconButton
+              icon="heart-outline"
+              onPress={() => router.push("/saved")}
+              variant="solid"
+              size={36}
+              iconSize={18}
+              color="#0F172A"
+            />
+            <HeaderIconButton
+              icon="notifications-outline"
+              onPress={() => router.push("/notifications")}
+              variant="solid"
+              size={36}
+              iconSize={18}
+              color="#0F172A"
+              showDot
+            />
           </View>
         </View>
 
@@ -223,13 +234,17 @@ export default function Home() {
             </Pressable>
 
             <View style={s.actionsRow}>
-              <Pressable onPress={() => router.push("/saved")} style={s.iconBtn}>
-                <Ionicons name="heart-outline" size={18} color="white" />
-              </Pressable>
-              <Pressable onPress={() => router.push("/notifications")} style={s.iconBtn}>
-                <Ionicons name="notifications-outline" size={18} color="white" />
-                <View style={s.iconDot} />
-              </Pressable>
+              <HeaderIconButton
+                icon="heart-outline"
+                onPress={() => router.push("/saved")}
+                variant="translucent"
+              />
+              <HeaderIconButton
+                icon="notifications-outline"
+                onPress={() => router.push("/notifications")}
+                variant="translucent"
+                showDot
+              />
             </View>
           </View>
 
