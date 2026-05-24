@@ -11,6 +11,7 @@ import { productsAPI, categoriesAPI } from "../../lib/api";
 import { transformProduct, transformCategory } from "../../lib/transformers";
 import type { Product, Category } from "../../lib/types";
 import { useAuth } from "../../lib/auth-context";
+import { useNotifications } from "../../lib/notifications-context";
 import { categories as STATIC_CATS } from "../../data/products";
 import ProductCard from "../../components/ProductCard";
 import HeaderIconButton from "../../components/HeaderIconButton";
@@ -28,6 +29,7 @@ const ALL = "All";
 export default function Home() {
   const insets = useSafeAreaInsets();
   const { user, customer } = useAuth();
+  const { unreadCount } = useNotifications();
   const [placeholder, setPlaceholder] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
   const [liveCategories, setLiveCategories] = useState<Category[]>([]);
@@ -190,7 +192,7 @@ export default function Home() {
               size={36}
               iconSize={18}
               color="#0F172A"
-              showDot
+              showDot={unreadCount}
             />
           </View>
         </View>
@@ -238,7 +240,11 @@ export default function Home() {
           style={[s.banner, { paddingTop: insets.top + 16 }]}
         >
           <View style={s.topRow}>
-            <Pressable onPress={() => router.push("/addresses")} style={{ flex: 1 }}>
+            <Pressable
+              onPress={() => router.push("/addresses")}
+              style={s.addressBtn}
+              hitSlop={6}
+            >
               <Text style={s.eyebrow}>DELIVER TO</Text>
               <View style={s.locationRow}>
                 <Ionicons name="location-sharp" size={14} color="white" />
@@ -252,12 +258,16 @@ export default function Home() {
                 icon="heart-outline"
                 onPress={() => router.push("/saved")}
                 variant="translucent"
+                size={44}
+                iconSize={22}
               />
               <HeaderIconButton
                 icon="notifications-outline"
                 onPress={() => router.push("/notifications")}
                 variant="translucent"
-                showDot
+                size={44}
+                iconSize={22}
+                showDot={unreadCount}
               />
             </View>
           </View>
@@ -490,11 +500,17 @@ const s = StyleSheet.create({
     paddingHorizontal: 20, paddingBottom: 60,
     borderBottomLeftRadius: 26, borderBottomRightRadius: 26,
   },
-  topRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
+  topRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  // Limit the address Pressable to its own content so it can't steal taps from the icons to its right.
+  addressBtn: { alignSelf: "flex-start" },
   eyebrow: { color: "rgba(255,255,255,0.78)", fontSize: 10.5, fontWeight: "700", letterSpacing: 1.6 },
   locationRow: { flexDirection: "row", alignItems: "center", marginTop: 4 },
   locationText: { color: "white", fontSize: 16, fontWeight: "800", marginLeft: 6, letterSpacing: -0.2 },
-  actionsRow: { flexDirection: "row", gap: 12, alignItems: "center", zIndex: 5 },
+  actionsRow: {
+    flexDirection: "row", gap: 10, alignItems: "center",
+    marginLeft: "auto",
+    zIndex: 30, elevation: 30,
+  },
   iconBtn: {
     width: 40, height: 40, borderRadius: 20,
     backgroundColor: "rgba(255,255,255,0.20)",

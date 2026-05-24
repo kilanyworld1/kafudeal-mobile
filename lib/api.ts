@@ -734,6 +734,92 @@ export const contentAPI = {
 };
 
 /**
+ * NOTIFICATIONS — mobile-side reads of rows written by DB triggers (v8).
+ * Inserts happen server-side via SECURITY DEFINER triggers on `orders`.
+ */
+export const notificationsAPI = {
+  list: async (limit = 50) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return { data: [], error: null };
+      const { data: customer } = await supabase
+        .from("customers")
+        .select("id")
+        .eq("auth_user_id", user.id)
+        .maybeSingle();
+      if (!customer) return { data: [], error: null };
+      const { data, error } = await supabase
+        .from("notifications")
+        .select("*")
+        .eq("customer_id", customer.id)
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      if (error) return handleError(error);
+      return { data, error: null };
+    } catch (e) {
+      return handleError(e);
+    }
+  },
+
+  unreadCount: async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return { data: 0, error: null };
+      const { data: customer } = await supabase
+        .from("customers")
+        .select("id")
+        .eq("auth_user_id", user.id)
+        .maybeSingle();
+      if (!customer) return { data: 0, error: null };
+      const { count, error } = await supabase
+        .from("notifications")
+        .select("id", { count: "exact", head: true })
+        .eq("customer_id", customer.id)
+        .eq("read", false);
+      if (error) return handleError(error);
+      return { data: count || 0, error: null };
+    } catch (e) {
+      return handleError(e);
+    }
+  },
+
+  markRead: async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from("notifications")
+        .update({ read: true })
+        .eq("id", id);
+      if (error) return handleError(error);
+      return { data: { success: true }, error: null };
+    } catch (e) {
+      return handleError(e);
+    }
+  },
+
+  markAllRead: async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return handleError({ message: "Not authenticated" });
+      const { data: customer } = await supabase
+        .from("customers")
+        .select("id")
+        .eq("auth_user_id", user.id)
+        .maybeSingle();
+      if (!customer) return handleError({ message: "Customer profile not found" });
+      const { error } = await supabase
+        .from("notifications")
+        .update({ read: true })
+        .eq("customer_id", customer.id)
+        .eq("read", false);
+      if (error) return handleError(error);
+      return { data: { success: true }, error: null };
+    } catch (e) {
+      return handleError(e);
+    }
+  },
+};
+
+/**
  * SAVED / WISHLIST — mobile-specific addition (web doesn't have this yet).
  * Uses the saved_products table created earlier.
  */

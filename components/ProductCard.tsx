@@ -46,7 +46,7 @@ export default function ProductCard({ product: p, width, variant = "default" }: 
         <View style={s.disc}><Text style={s.discText}>-{p.discount}%</Text></View>
         {p.expiringSoon && (
           <View style={s.expSoon}>
-            <Ionicons name="time" size={9} color="#854F0B" />
+            <Ionicons name="time" size={9} color="white" />
             <Text style={s.expSoonText}>Expiring soon</Text>
           </View>
         )}
@@ -99,10 +99,10 @@ const s = StyleSheet.create({
   expSoon: {
     position: "absolute", bottom: 8, left: 8,
     flexDirection: "row", alignItems: "center", gap: 3,
-    backgroundColor: "#FEF3C7",
+    backgroundColor: "#DC2626",
     paddingHorizontal: 6, paddingVertical: 3, borderRadius: 5,
   },
-  expSoonText: { color: "#854F0B", fontSize: 9, fontWeight: "800", letterSpacing: 0.2 },
+  expSoonText: { color: "white", fontSize: 9, fontWeight: "800", letterSpacing: 0.2 },
   favBtn: {
     position: "absolute", top: 8, right: 8,
     width: 30, height: 30, borderRadius: 15,

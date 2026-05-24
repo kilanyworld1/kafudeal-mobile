@@ -3,12 +3,14 @@ import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { AuthProvider } from "../lib/auth-context";
 import { CartProvider } from "../lib/cart-context";
+import { NotificationsProvider } from "../lib/notifications-context";
 
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthProvider>
         <CartProvider>
+        <NotificationsProvider>
         <StatusBar style="light" />
         <Stack screenOptions={{ headerShown: false, animation: "slide_from_right" }}>
           <Stack.Screen name="index" options={{ animation: "fade" }} />
@@ -28,6 +30,7 @@ export default function RootLayout() {
           <Stack.Screen name="help" />
           <Stack.Screen name="auth-callback" options={{ animation: "fade" }} />
         </Stack>
+        </NotificationsProvider>
         </CartProvider>
       </AuthProvider>
     </GestureHandlerRootView>

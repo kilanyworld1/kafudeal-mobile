@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { Pressable, Animated, View, StyleSheet } from "react-native";
+import { Pressable, Animated, View, StyleSheet, Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 type Props = {
@@ -9,7 +9,8 @@ type Props = {
   size?: number;
   iconSize?: number;
   color?: string;
-  showDot?: boolean;
+  /** Show a small badge dot if true, or render a count badge if a number > 0 is provided */
+  showDot?: boolean | number;
 };
 
 /**
@@ -45,54 +46,93 @@ export default function HeaderIconButton({
   const dotBorderColor = variant === "translucent" ? "#FF8C3A" : "white";
 
   return (
-    <Pressable
-      onPress={onPress}
-      onPressIn={pressIn}
-      onPressOut={pressOut}
-      // Generous tap area — the icon is ~20px but the touch zone is ~80px now
-      hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
-      android_ripple={{ color: "rgba(255,255,255,0.15)", borderless: true, radius: size }}
-    >
-      <Animated.View
-        style={[
-          {
-            width: size,
-            height: size,
-            borderRadius: size / 2,
-            backgroundColor: bg,
-            borderWidth: variant === "translucent" ? 1 : 0,
-            borderColor,
-            alignItems: "center",
-            justifyContent: "center",
-            transform: [{ scale }],
-          },
-        ]}
+    // Wrapper View carries the elevation/zIndex so taps always reach this button
+    // even when it overlaps the gradient banner behind it.
+    <View style={s.wrap}>
+      <Pressable
+        onPress={onPress}
+        onPressIn={pressIn}
+        onPressOut={pressOut}
+        // Generous tap area — the icon is ~20px but the touch zone is ~80px now
+        hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+        android_ripple={{ color: "rgba(255,255,255,0.15)", borderless: true, radius: size }}
       >
-        <Ionicons name={icon} size={iconSize} color={color} />
-        {showDot && (
-          <View
-            style={[
-              s.dot,
-              {
-                backgroundColor: variant === "translucent" ? "#FFC857" : "#FF6B2C",
-                borderColor: dotBorderColor,
-                top: size * 0.18,
-                right: size * 0.18,
-              },
-            ]}
-          />
-        )}
-      </Animated.View>
-    </Pressable>
+        <Animated.View
+          style={[
+            {
+              width: size,
+              height: size,
+              borderRadius: size / 2,
+              backgroundColor: bg,
+              borderWidth: variant === "translucent" ? 1 : 0,
+              borderColor,
+              alignItems: "center",
+              justifyContent: "center",
+              transform: [{ scale }],
+            },
+          ]}
+        >
+          <Ionicons name={icon} size={iconSize} color={color} />
+          {typeof showDot === "number" && showDot > 0 ? (
+            <View
+              style={[
+                s.countBadge,
+                {
+                  borderColor: dotBorderColor,
+                  top: -2,
+                  right: -2,
+                },
+              ]}
+            >
+              <Text style={s.countText}>{showDot > 99 ? "99+" : showDot}</Text>
+            </View>
+          ) : showDot ? (
+            <View
+              style={[
+                s.dot,
+                {
+                  backgroundColor: variant === "translucent" ? "#FFC857" : "#FF6B2C",
+                  borderColor: dotBorderColor,
+                  top: size * 0.18,
+                  right: size * 0.18,
+                },
+              ]}
+            />
+          ) : null}
+        </Animated.View>
+      </Pressable>
+    </View>
   );
 }
 
 const s = StyleSheet.create({
+  // Stack above the gradient banner so the entire hitSlop receives taps
+  wrap: {
+    zIndex: 20,
+    elevation: 20,
+  },
   dot: {
     position: "absolute",
     width: 9,
     height: 9,
     borderRadius: 4.5,
     borderWidth: 2,
+  },
+  countBadge: {
+    position: "absolute",
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 4,
+    borderRadius: 9,
+    backgroundColor: "#DC2626",
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  countText: {
+    color: "white",
+    fontSize: 10,
+    fontWeight: "800",
+    lineHeight: 12,
   },
 });

@@ -10,8 +10,9 @@ import { supabase } from "../../lib/supabase";
 import type { Order } from "../../lib/types";
 
 const STEPS = [
-  { keys: ["pending", "confirmed"], emoji: "✓", label: "Confirmed" },
-  { keys: ["preparing", "ready"], emoji: "📦", label: "Preparing" },
+  // 'new' rows from older orders still map to step 0 so the tracker isn't blank
+  { keys: ["new", "pending", "confirmed"], emoji: "✓", label: "Confirmed" },
+  { keys: ["preparing", "ready", "ready_for_delivery", "ready_for_pickup"], emoji: "📦", label: "Preparing" },
   { keys: ["on_the_way", "out_for_delivery"], emoji: "🚚", label: "On the Way" },
   { keys: ["delivered"], emoji: "🏠", label: "Delivered" },
 ];
@@ -165,8 +166,11 @@ export default function OrderTracking() {
 
         {!cancelled && (
           <View style={s.tracker}>
-            <View style={s.lineBg} />
-            <Animated.View style={[s.lineFill, { width: progressW }]} />
+            {/* Track line is wrapped so lineFill's % is relative to the visible track */}
+            <View style={s.trackLineWrap} pointerEvents="none">
+              <View style={s.lineBg} />
+              <Animated.View style={[s.lineFill, { width: progressW }]} />
+            </View>
             <View style={s.stepsRow}>
               {STEPS.map((st, i) => {
                 const done = i < step;
@@ -177,6 +181,7 @@ export default function OrderTracking() {
                     <View style={[s.dot, done && s.dotDone, now && s.dotNow]}>
                       {now && (
                         <Animated.View
+                          pointerEvents="none"
                           style={[
                             s.nowHalo,
                             { transform: [{ scale: nowScale }], opacity: nowOpacity },
@@ -338,13 +343,17 @@ const s = StyleSheet.create({
   stageTitle: { fontSize: 16, fontWeight: "800", color: "#C2410C" },
   stageSub: { fontSize: 12, color: "#9A3412", marginTop: 3 },
   tracker: { marginTop: 22, marginHorizontal: 4, position: "relative", height: 80, justifyContent: "center" },
+  // Wrap so the lineFill's "100%" lines up with the visible track between dot centers
+  trackLineWrap: {
+    position: "absolute", top: 22, left: 35, right: 35, height: 4,
+  },
   lineBg: {
-    position: "absolute", top: 22, left: 20, right: 20,
-    height: 4, backgroundColor: "#E5E7EB", borderRadius: 2,
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#E5E7EB", borderRadius: 2,
   },
   lineFill: {
-    position: "absolute", top: 22, left: 20,
-    height: 4, backgroundColor: "#FF6B2C", borderRadius: 2,
+    position: "absolute", top: 0, left: 0, height: 4,
+    backgroundColor: "#FF6B2C", borderRadius: 2,
   },
   stepsRow: { flexDirection: "row", justifyContent: "space-between" },
   stepCol: { alignItems: "center", width: 70 },
@@ -353,13 +362,14 @@ const s = StyleSheet.create({
     backgroundColor: "white",
     borderWidth: 2, borderColor: "#E5E7EB",
     alignItems: "center", justifyContent: "center",
+    overflow: "visible",
   },
   dotDone: { backgroundColor: "#FF6B2C", borderColor: "#FF6B2C" },
   dotNow: { backgroundColor: "#FFE7D1", borderColor: "#FF6B2C" },
   dotEmoji: { fontSize: 18 },
   nowHalo: {
-    position: "absolute", top: -2, left: -2, right: -2, bottom: -2,
-    borderRadius: 24, backgroundColor: "#FF6B2C",
+    position: "absolute", top: -6, left: -6, right: -6, bottom: -6,
+    borderRadius: 28, backgroundColor: "#FF6B2C", zIndex: -1,
   },
   stepLabel: { fontSize: 10.5, color: "#94A3B8", fontWeight: "700", marginTop: 6, textAlign: "center" },
   stepLabelActive: { color: "#0F172A" },

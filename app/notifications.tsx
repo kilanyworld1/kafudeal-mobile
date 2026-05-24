@@ -1,121 +1,172 @@
-import { View, Text, ScrollView, Pressable, Image, StyleSheet } from "react-native";
+import { useMemo } from "react";
+import { View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator, RefreshControl } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
+import { useNotifications, Notification } from "../lib/notifications-context";
+import { useAuth } from "../lib/auth-context";
 
-type Notif = {
-  id: string;
-  title: string;
-  body: string;
-  time: string;
-  unread: boolean;
-  icon: keyof typeof Ionicons.glyphMap;
-  tint: string;
-  iconColor: string;
-  image?: string;
-  cta?: string;
-};
+type IconMeta = { icon: keyof typeof Ionicons.glyphMap; tint: string; iconColor: string };
 
-const TODAY: Notif[] = [
-  {
-    id: "n1",
-    title: "Order on the way 🛵",
-    body: "Your order #KFD-A3F8B921 is ~10 min away. Tap to track.",
-    time: "Just now", unread: true,
-    icon: "bicycle", tint: "#FFE7D1", iconColor: "#FF6B2C",
-    cta: "Track order →",
-  },
-  {
-    id: "n2",
-    title: "Flash deal — Lindt 85% Dark",
-    body: "70% off · only 8 left at this price.",
-    time: "1h ago", unread: true,
-    icon: "flame", tint: "#FEE2E2", iconColor: "#DC2626",
-    image: "https://images.unsplash.com/photo-1481391319762-47dff72954d9?w=200&q=80",
-  },
-  {
-    id: "n3",
-    title: "You earned a voucher 🎁",
-    body: "KAFU10 — Save AED 10 on your next order.",
-    time: "Today · 09:14", unread: false,
-    icon: "ticket", tint: "#ECFDF5", iconColor: "#16A34A",
-  },
-];
+function iconForType(type: string): IconMeta {
+  if (type.startsWith("order_status_delivered")) {
+    return { icon: "checkmark-circle", tint: "#ECFDF5", iconColor: "#15803D" };
+  }
+  if (type.startsWith("order_status_out_for_delivery") || type.includes("out_for_delivery")) {
+    return { icon: "bicycle", tint: "#FFE7D1", iconColor: "#FF6B2C" };
+  }
+  if (type.startsWith("order_status_preparing")) {
+    return { icon: "cube", tint: "#EEF2FF", iconColor: "#4F46E5" };
+  }
+  if (type.startsWith("order_status_ready")) {
+    return { icon: "bag-handle", tint: "#FEF3C7", iconColor: "#92400E" };
+  }
+  if (type.startsWith("order_status_cancelled")) {
+    return { icon: "close-circle", tint: "#FEE2E2", iconColor: "#DC2626" };
+  }
+  if (type.startsWith("order_status_refunded")) {
+    return { icon: "cash", tint: "#ECFDF5", iconColor: "#15803D" };
+  }
+  if (type.startsWith("order")) {
+    return { icon: "receipt", tint: "#FFE7D1", iconColor: "#FF6B2C" };
+  }
+  return { icon: "notifications", tint: "#F1EFE8", iconColor: "#0F172A" };
+}
 
-const EARLIER: Notif[] = [
-  {
-    id: "n4",
-    title: "Order delivered ✅",
-    body: "Order #KFD-2D9F1C44 was delivered. Rate your experience.",
-    time: "Yesterday", unread: false,
-    icon: "checkmark-circle", tint: "#ECFDF5", iconColor: "#15803D",
-  },
-  {
-    id: "n5",
-    title: "New iftar deals just landed 🌙",
-    body: "Up to 60% off on dates, fresh and dairy.",
-    time: "2 days ago", unread: false,
-    icon: "moon", tint: "#EAF3FF", iconColor: "#1D4ED8",
-  },
-  {
-    id: "n6",
-    title: "Price dropped on a saved item",
-    body: "Artisan Sourdough is now AED 9 (was AED 20).",
-    time: "3 days ago", unread: false,
-    icon: "trending-down", tint: "#FFE7D1", iconColor: "#FF6B2C",
-    image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=200&q=80",
-  },
-];
+function formatTime(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffMin = Math.floor(diffMs / (1000 * 60));
+  if (diffMin < 1) return "Just now";
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHrs = Math.floor(diffMin / 60);
+  if (diffHrs < 24) return `${diffHrs}h ago`;
+  const diffDays = Math.floor(diffHrs / 24);
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+}
+
+function isToday(iso: string): boolean {
+  const d = new Date(iso);
+  const now = new Date();
+  return d.toDateString() === now.toDateString();
+}
 
 export default function Notifications() {
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
+  const { notifications, loading, refresh, markRead, markAllRead } = useNotifications();
+
+  const { today, earlier } = useMemo(() => {
+    const today: Notification[] = [];
+    const earlier: Notification[] = [];
+    for (const n of notifications) {
+      if (isToday(n.created_at)) today.push(n);
+      else earlier.push(n);
+    }
+    return { today, earlier };
+  }, [notifications]);
+
+  const handlePress = async (n: Notification) => {
+    if (!n.read) await markRead(n.id);
+    if (n.related_type === "order" && n.related_id) {
+      router.push(`/order/${n.related_id}`);
+    } else if (n.related_type === "product" && n.related_id) {
+      router.push(`/product/${n.related_id}`);
+    }
+  };
+
   return (
     <View style={s.root}>
       <View style={[s.topBar, { paddingTop: insets.top + 8 }]}>
-        <Pressable onPress={() => router.back()} style={s.iconBtn}>
+        <Pressable
+          onPress={() => {
+            if (router.canGoBack()) router.back();
+            else router.replace("/(tabs)");
+          }}
+          style={s.iconBtn}
+          hitSlop={12}
+        >
           <Ionicons name="chevron-back" size={24} color="#0F172A" />
         </Pressable>
         <Text style={s.topTitle}>Notifications</Text>
-        <Pressable style={s.iconBtn}>
+        <Pressable
+          style={s.iconBtn}
+          onPress={() => markAllRead()}
+          hitSlop={12}
+        >
           <Ionicons name="checkmark-done" size={22} color="#FF6B2C" />
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
-        <Text style={s.section}>TODAY</Text>
-        {TODAY.map((n) => <NotifRow key={n.id} n={n} />)}
-
-        <Text style={[s.section, { marginTop: 18 }]}>EARLIER</Text>
-        {EARLIER.map((n) => <NotifRow key={n.id} n={n} />)}
-
-        <View style={s.footer}>
-          <Ionicons name="notifications-outline" size={18} color="#94A3B8" />
-          <Text style={s.footerText}>You're all caught up</Text>
+      {!user ? (
+        <View style={s.empty}>
+          <Ionicons name="notifications-off-outline" size={48} color="#94A3B8" />
+          <Text style={s.emptyTitle}>Sign in to see your notifications</Text>
+          <Text style={s.emptySub}>Order updates and personalised alerts will show up here.</Text>
+          <Pressable onPress={() => router.push("/login")} style={s.emptyCta}>
+            <Text style={s.emptyCtaText}>Sign in</Text>
+          </Pressable>
         </View>
-      </ScrollView>
+      ) : loading && notifications.length === 0 ? (
+        <View style={s.empty}>
+          <ActivityIndicator color="#FF6B2C" size="large" />
+        </View>
+      ) : notifications.length === 0 ? (
+        <View style={s.empty}>
+          <Ionicons name="notifications-outline" size={48} color="#94A3B8" />
+          <Text style={s.emptyTitle}>You're all caught up</Text>
+          <Text style={s.emptySub}>We'll let you know the moment something changes with your orders.</Text>
+        </View>
+      ) : (
+        <ScrollView
+          contentContainerStyle={{ padding: 16, paddingBottom: 60 }}
+          refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor="#FF6B2C" />}
+        >
+          {today.length > 0 && (
+            <>
+              <Text style={s.section}>TODAY</Text>
+              {today.map((n) => <NotifRow key={n.id} n={n} onPress={() => handlePress(n)} />)}
+            </>
+          )}
+
+          {earlier.length > 0 && (
+            <>
+              <Text style={[s.section, today.length > 0 && { marginTop: 18 }]}>EARLIER</Text>
+              {earlier.map((n) => <NotifRow key={n.id} n={n} onPress={() => handlePress(n)} />)}
+            </>
+          )}
+
+          <View style={s.footer}>
+            <Ionicons name="notifications-outline" size={18} color="#94A3B8" />
+            <Text style={s.footerText}>That's everything for now</Text>
+          </View>
+        </ScrollView>
+      )}
     </View>
   );
 }
 
-function NotifRow({ n }: { n: Notif }) {
+function NotifRow({ n, onPress }: { n: Notification; onPress: () => void }) {
+  const meta = iconForType(n.type);
   return (
-    <Pressable style={[s.card, n.unread && s.cardUnread]}>
-      {n.image ? (
-        <Image source={{ uri: n.image }} style={s.thumb} />
-      ) : (
-        <View style={[s.iconWrap, { backgroundColor: n.tint }]}>
-          <Ionicons name={n.icon} size={20} color={n.iconColor} />
-        </View>
-      )}
+    <Pressable onPress={onPress} style={[s.card, !n.read && s.cardUnread]}>
+      <View style={[s.iconWrap, { backgroundColor: meta.tint }]}>
+        <Ionicons name={meta.icon} size={20} color={meta.iconColor} />
+      </View>
       <View style={{ flex: 1 }}>
         <View style={s.titleRow}>
           <Text style={s.title} numberOfLines={1}>{n.title}</Text>
-          {n.unread && <View style={s.unreadDot} />}
+          {!n.read && <View style={s.unreadDot} />}
         </View>
-        <Text style={s.body}>{n.body}</Text>
+        {n.body ? <Text style={s.body}>{n.body}</Text> : null}
         <View style={s.metaRow}>
-          <Text style={s.time}>{n.time}</Text>
-          {n.cta && <Text style={s.cta}>{n.cta}</Text>}
+          <Text style={s.time}>{formatTime(n.created_at)}</Text>
+          {n.related_type === "order" && (
+            <Text style={s.cta}>Track order →</Text>
+          )}
         </View>
       </View>
     </Pressable>
@@ -143,7 +194,6 @@ const s = StyleSheet.create({
     backgroundColor: "#FFF4EC",
     borderWidth: 1, borderColor: "rgba(255,107,44,0.20)",
   },
-  thumb: { width: 48, height: 48, borderRadius: 10, backgroundColor: "#F1EFE8" },
   iconWrap: {
     width: 48, height: 48, borderRadius: 24,
     alignItems: "center", justifyContent: "center",
@@ -160,4 +210,15 @@ const s = StyleSheet.create({
     gap: 6, marginTop: 18, padding: 12,
   },
   footerText: { fontSize: 12, color: "#94A3B8", fontWeight: "600" },
+  empty: {
+    flex: 1, alignItems: "center", justifyContent: "center",
+    padding: 40, gap: 12,
+  },
+  emptyTitle: { fontSize: 16, fontWeight: "800", color: "#0F172A", marginTop: 4 },
+  emptySub: { fontSize: 13, color: "#64748B", textAlign: "center", marginTop: -4 },
+  emptyCta: {
+    marginTop: 12, backgroundColor: "#FF6B2C",
+    paddingHorizontal: 22, paddingVertical: 12, borderRadius: 10,
+  },
+  emptyCtaText: { color: "white", fontWeight: "800" },
 });
