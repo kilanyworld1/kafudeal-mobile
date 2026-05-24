@@ -99,7 +99,7 @@ export const productsAPI = {
         `
         )
         .eq("id", id)
-        .single();
+        .maybeSingle();
 
       if (error) return handleError(error);
       return { data, error: null };
@@ -413,6 +413,11 @@ export const cartAPI = {
 export const ordersAPI = {
   createOrder: async (orderData: Record<string, any> = {}) => {
     try {
+      // Strip undefined/null keys so we never send a column that's been disabled
+      orderData = Object.fromEntries(
+        Object.entries(orderData).filter(([_, v]) => v !== undefined && v !== null)
+      );
+
       const {
         data: { user },
       } = await supabase.auth.getUser();

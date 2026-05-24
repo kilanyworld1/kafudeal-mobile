@@ -50,12 +50,12 @@ export default function Checkout() {
     }
 
     setPlacing(true);
-    // Web's createOrder reads cart_items from server and snapshots the
-    // customer info itself. We only pass the extra fields (payment, voucher).
-    const { data, error } = await ordersAPI.createOrder({
+    // Only send fields that are real columns on `orders` in the current schema.
+    // voucher_code is not yet a column on the table → would crash the insert.
+    const orderData: Record<string, any> = {
       payment_method: payments.find((p) => p.id === pay)?.label || "Card",
-      voucher_code: vApplied ? voucher : undefined,
-    });
+    };
+    const { data, error } = await ordersAPI.createOrder(orderData);
     setPlacing(false);
 
     if (error || !data) {

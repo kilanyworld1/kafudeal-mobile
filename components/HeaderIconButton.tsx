@@ -49,7 +49,9 @@ export default function HeaderIconButton({
       onPress={onPress}
       onPressIn={pressIn}
       onPressOut={pressOut}
-      hitSlop={14}
+      // Generous tap area — the icon is ~20px but the touch zone is ~80px now
+      hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+      android_ripple={{ color: "rgba(255,255,255,0.15)", borderless: true, radius: size }}
     >
       <Animated.View
         style={[

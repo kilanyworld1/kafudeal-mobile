@@ -135,7 +135,15 @@ export default function OrderTracking() {
   return (
     <View style={s.root}>
       <View style={[s.topBar, { paddingTop: insets.top + 8 }]}>
-        <Pressable onPress={() => router.replace("/(tabs)/orders")} style={s.backBtn}>
+        <Pressable
+          onPress={() => {
+            // Match the OS back gesture — pop the screen if possible, else go to orders
+            if (router.canGoBack()) router.back();
+            else router.replace("/(tabs)/orders");
+          }}
+          style={s.backBtn}
+          hitSlop={12}
+        >
           <Ionicons name="chevron-back" size={22} color="#0F172A" />
         </Pressable>
         <View style={{ flex: 1, marginLeft: 8 }}>

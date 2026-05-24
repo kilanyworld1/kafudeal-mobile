@@ -44,6 +44,12 @@ export default function ProductCard({ product: p, width, variant = "default" }: 
       <View style={s.imgWrap}>
         <Image source={{ uri: p.image }} style={{ width: "100%", height: "100%" }} />
         <View style={s.disc}><Text style={s.discText}>-{p.discount}%</Text></View>
+        {p.expiringSoon && (
+          <View style={s.expSoon}>
+            <Ionicons name="time" size={9} color="#854F0B" />
+            <Text style={s.expSoonText}>Expiring soon</Text>
+          </View>
+        )}
         <Pressable onPress={pressHeart} style={s.favBtn} hitSlop={8}>
           <Animated.View style={{ transform: [{ scale: heartScale }] }}>
             <Ionicons
@@ -90,6 +96,13 @@ const s = StyleSheet.create({
     paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6,
   },
   discText: { color: "white", fontSize: 11, fontWeight: "800" },
+  expSoon: {
+    position: "absolute", bottom: 8, left: 8,
+    flexDirection: "row", alignItems: "center", gap: 3,
+    backgroundColor: "#FEF3C7",
+    paddingHorizontal: 6, paddingVertical: 3, borderRadius: 5,
+  },
+  expSoonText: { color: "#854F0B", fontSize: 9, fontWeight: "800", letterSpacing: 0.2 },
   favBtn: {
     position: "absolute", top: 8, right: 8,
     width: 30, height: 30, borderRadius: 15,

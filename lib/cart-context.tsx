@@ -34,12 +34,13 @@ type CartContextValue = {
 const CartContext = createContext<CartContextValue | null>(null);
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  const { customer } = useAuth();
+  const { customer, user } = useAuth();
   const [items, setItems] = useState<LocalCartItem[]>([]);
   const [saved, setSaved] = useState<string[]>([]);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const badgeScale = useRef(new Animated.Value(1)).current;
   const toastId = useRef(0);
+  const prevUserRef = useRef<string | null>(null);
 
   const bump = () => {
     Animated.sequence([
@@ -54,6 +55,25 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setToasts((prev) => [...prev, { ...t, id }]);
     setTimeout(() => setToasts((prev) => prev.filter((x) => x.id !== id)), 2200);
   }, []);
+
+  // Toast on auth state changes (sign in / sign out)
+  useEffect(() => {
+    const currentId = user?.id || null;
+    const prevId = prevUserRef.current;
+    if (prevId === null && currentId !== null) {
+      // signed in
+      const name =
+        customer?.fullName ||
+        (user?.user_metadata?.full_name as string) ||
+        user?.email?.split("@")[0] ||
+        "back";
+      showToast({ message: `Welcome back, ${name} 👋`, kind: "save" });
+    } else if (prevId !== null && currentId === null) {
+      // signed out
+      showToast({ message: "Signed out", kind: "info" });
+    }
+    prevUserRef.current = currentId;
+  }, [user?.id, customer?.fullName]);
 
   // Server cart is the source of truth (matches web). Load it when the user changes.
   const refreshCart = useCallback(async () => {

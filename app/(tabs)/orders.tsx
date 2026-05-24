@@ -175,25 +175,37 @@ function PastRow({ order }: { order: Order }) {
   const items = order.items || [];
   const imgs = items.slice(0, 3).map((it) => it.product?.image).filter(Boolean);
   return (
-    <Pressable onPress={() => router.push(`/order/${order.id}`)} style={s.pastCard}>
-      <View style={s.pastImgRow}>
-        {imgs.map((img, i) => (
-          <Image key={i} source={{ uri: img! }} style={s.pastImg} />
-        ))}
-      </View>
-      <View style={{ flex: 1, justifyContent: "center" }}>
-        <Text style={s.pastId}>#{order.shortId}</Text>
-        <Text style={s.pastDate}>{formatDate(order.createdAt)} · {order.itemsCount} {order.itemsCount === 1 ? "item" : "items"}</Text>
-        <View style={[s.statusPill, { backgroundColor: meta.bg, alignSelf: "flex-start", marginTop: 6 }]}>
-          <Text style={[s.statusText, { color: meta.color }]}>{meta.label}</Text>
+    <Pressable onPress={() => router.push(`/order/${order.id}`)} style={s.card}>
+      <View style={s.cardTop}>
+        <View>
+          <Text style={s.cardLabel}>ORDER</Text>
+          <Text style={s.cardId}>#{order.shortId}</Text>
+          <Text style={s.cardDate}>{formatDate(order.createdAt)}</Text>
+        </View>
+        <View style={{ alignItems: "flex-end" }}>
+          <Text style={s.cardLabel}>Total</Text>
+          <Text style={s.cardTotal}>AED {order.total.toFixed(2)}</Text>
+          <View style={[s.statusPill, { backgroundColor: meta.bg }]}>
+            <Text style={[s.statusText, { color: meta.color }]}>{meta.label}</Text>
+          </View>
         </View>
       </View>
-      <View style={{ alignItems: "flex-end" }}>
-        <Text style={s.pastTotal}>AED {order.total.toFixed(2)}</Text>
-        <Pressable style={s.reorderBtn}>
+
+      {imgs.length > 0 && (
+        <View style={s.imgRow}>
+          {imgs.map((img, i) => (
+            <Image key={i} source={{ uri: img! }} style={s.imgChip} />
+          ))}
+          <Text style={s.itemsText}>{order.itemsCount} {order.itemsCount === 1 ? "item" : "items"}</Text>
+        </View>
+      )}
+
+      <View style={s.cardActions}>
+        <Pressable style={s.reorderBtn} onPress={(e) => e.stopPropagation?.()}>
           <Ionicons name="refresh" size={12} color="#FF6B2C" />
           <Text style={s.reorderText}>Reorder</Text>
         </Pressable>
+        <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
       </View>
     </Pressable>
   );

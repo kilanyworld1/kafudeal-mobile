@@ -25,6 +25,7 @@ export type Product = {
   discount: number;       // alias for discountPercentage
   endsIn: string;         // formatted "8h left" / "Tomorrow" / "2d left"
   urgent: boolean;        // < 24h
+  expiringSoon?: boolean; // <= 14 days (matches web's "Expiring soon" banner)
 };
 
 export type Category = {

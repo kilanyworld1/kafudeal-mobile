@@ -105,11 +105,11 @@ export default function Home() {
     return { endingSoon, topDeals };
   }, [filteredProducts]);
 
-  // Categories with icon metadata
+  // All categories from DB (no slice — show everything the admin has added)
   const displayCategories = useMemo(() => {
     const arr = [{ key: ALL, label: ALL, emoji: "✨", tint: "#FFF1E5" } as any];
     if (liveCategories.length > 0) {
-      liveCategories.slice(0, 7).forEach((c) => {
+      liveCategories.forEach((c) => {
         const match = STATIC_CATS.find((sc) => sc.label.toLowerCase() === c.name.toLowerCase());
         arr.push({
           key: c.name,
@@ -123,6 +123,17 @@ export default function Home() {
     }
     return arr;
   }, [liveCategories]);
+
+  // Group products by category — for the dynamic per-category sections in the body
+  const productsByCategory = useMemo(() => {
+    const map = new Map<string, Product[]>();
+    for (const p of products) {
+      const cat = p.category || "Other";
+      if (!map.has(cat)) map.set(cat, []);
+      map.get(cat)!.push(p);
+    }
+    return map;
+  }, [products]);
 
   const avatarUrl =
     (user?.user_metadata?.avatar_url as string) ||
@@ -372,6 +383,26 @@ export default function Home() {
               </View>
             )}
 
+            {/* When viewing ALL, render one section per category (web parity) */}
+            {selectedCat === ALL &&
+              Array.from(productsByCategory.entries()).map(([catName, list]) => {
+                if (list.length === 0) return null;
+                const meta = displayCategories.find((c) => c.label === catName);
+                const emoji = meta?.emoji || "🛒";
+                return (
+                  <View key={catName}>
+                    <Section
+                      title={`${catName} ${emoji}`}
+                      sub={`${list.length} item${list.length === 1 ? "" : "s"}`}
+                      onSeeAll={() => {
+                        setSelectedCat(catName);
+                      }}
+                    />
+                    <HScroll items={list.slice(0, 12)} />
+                  </View>
+                );
+              })}
+
             <Section
               title={selectedCat === ALL ? "All deals" : `All ${selectedCat}`}
               sub={`${filteredProducts.length} items`}
@@ -460,7 +491,7 @@ const s = StyleSheet.create({
   eyebrow: { color: "rgba(255,255,255,0.78)", fontSize: 10.5, fontWeight: "700", letterSpacing: 1.6 },
   locationRow: { flexDirection: "row", alignItems: "center", marginTop: 4 },
   locationText: { color: "white", fontSize: 16, fontWeight: "800", marginLeft: 6, letterSpacing: -0.2 },
-  actionsRow: { flexDirection: "row", gap: 8, alignItems: "center" },
+  actionsRow: { flexDirection: "row", gap: 12, alignItems: "center", zIndex: 5 },
   iconBtn: {
     width: 40, height: 40, borderRadius: 20,
     backgroundColor: "rgba(255,255,255,0.20)",

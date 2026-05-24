@@ -25,9 +25,11 @@ export function transformProduct(p: any): Product {
 
   const original = Number(p.original_price) || 0;
   const discounted = Number(p.discounted_price) || original;
-  const discountPct =
+  // Always round so we never show 70.5% — match the web's display
+  const discountPct = Math.round(
     Number(p.discount_percentage) ||
-    (original > 0 ? Math.round((1 - discounted / original) * 100) : 0);
+      (original > 0 ? (1 - discounted / original) * 100 : 0)
+  );
 
   return {
     id: String(p.id),
@@ -53,6 +55,8 @@ export function transformProduct(p: any): Product {
     discount: discountPct,
     endsIn: fmtEndsIn(p.expiry_date),
     urgent: expiryDays <= 1,
+    // Match web: show "Expiring soon" banner for products with <= 14 days
+    expiringSoon: expDate !== null && expiryDays <= 14 && expiryDays > 0,
   };
 }
 
