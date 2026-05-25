@@ -1,87 +1,64 @@
 /**
- * Crisp Chat wrapper.
+ * Crisp Chat — in-app browser approach.
  *
- * The SDK ('react-native-crisp-chat-sdk') is a native module — it only works
- * inside an EAS build, never in Expo Go. To keep the JS bundle from crashing
- * if the native side is missing for any reason, every call is wrapped in a
- * try/catch with a console warning.
+ * We avoided the native SDK (`react-native-crisp-chat-sdk`) because its latest
+ * versions ship Kotlin 2.1.0 metadata, which Expo SDK 52's Gradle plugin can't
+ * read (it's locked to Kotlin 1.9.x). The in-app browser is reliable, ships
+ * immediately on any Expo SDK, and the Crisp hosted chat page is responsive
+ * and looks native.
  *
- * Website ID is hard-coded — matches the same ID used in the web app's
- * index.html. If you ever rotate it, update both.
+ * When we upgrade to Expo SDK 53+ later, we can switch to Crisp's official
+ * `crisp-sdk-react-native` for a true native overlay.
  */
 
+import * as WebBrowser from "expo-web-browser";
 import type { Customer } from "./types";
 
 const CRISP_WEBSITE_ID = "35a4fb2b-229a-4f51-b68c-17a367714873";
 
-// Lazy require so a missing native module never blocks the JS bundle from
-// loading. If the require fails we just no-op everything.
-let sdk: any = null;
-function loadSdk() {
-  if (sdk !== null) return sdk;
-  try {
-    sdk = require("react-native-crisp-chat-sdk");
-  } catch (e) {
-    console.warn("[crisp] SDK not available — chat features disabled", e);
-    sdk = false;
-  }
-  return sdk;
+// Keep an in-memory copy of the latest identified customer so openCrispChat()
+// can pass it as URL params when opening the hosted page.
+let currentCustomer: Customer | null = null;
+
+/** No-op on this implementation — kept for API parity. */
+export function initCrisp() {
+  // Hosted chat needs no boot step.
 }
 
-let configured = false;
+/** Remember the signed-in customer so we can pre-fill name/email when opening chat. */
+export function identifyCrispUser(customer: Customer | null) {
+  currentCustomer = customer;
+}
 
-export function initCrisp() {
-  if (configured) return;
-  const s = loadSdk();
-  if (!s) return;
-  try {
-    s.configure(CRISP_WEBSITE_ID);
-    configured = true;
-  } catch (e) {
-    console.warn("[crisp] configure failed", e);
-  }
+/** Clear the cached identity on sign-out so the next user starts fresh. */
+export function resetCrispSession() {
+  currentCustomer = null;
 }
 
 /**
- * Attach the signed-in customer to their Crisp session so support agents see
- * who they're talking to and message history persists across devices.
+ * Open Crisp's hosted chatbox in the in-app browser. The user can chat with
+ * support without leaving the app — closing the browser returns them to the
+ * exact screen they were on.
  */
-export function identifyCrispUser(customer: Customer | null) {
-  const s = loadSdk();
-  if (!s || !customer) return;
+export async function openCrispChat() {
   try {
-    if (customer.id && s.setUserTokenId) s.setUserTokenId(String(customer.id));
-    if (customer.email && s.setUserEmail) s.setUserEmail(customer.email);
-    if (customer.fullName && s.setUserNickname) s.setUserNickname(customer.fullName);
-    if (customer.phone && s.setUserPhone) s.setUserPhone(customer.phone);
-  } catch (e) {
-    console.warn("[crisp] identify failed", e);
-  }
-}
+    const params = new URLSearchParams({ website_id: CRISP_WEBSITE_ID });
 
-/** Call on sign-out so the next user doesn't inherit the previous session. */
-export function resetCrispSession() {
-  const s = loadSdk();
-  if (!s) return;
-  try {
-    s.resetSession?.();
-  } catch (e) {
-    console.warn("[crisp] reset failed", e);
-  }
-}
+    // Pre-fill identity if we know the user
+    if (currentCustomer?.email) params.set("user_email", currentCustomer.email);
+    if (currentCustomer?.fullName) params.set("user_nickname", currentCustomer.fullName);
+    if (currentCustomer?.phone) params.set("user_phone", currentCustomer.phone);
+    if (currentCustomer?.id) params.set("user_token", String(currentCustomer.id));
 
-/** Open the native Crisp chat overlay. Wire to any "Chat with us" button. */
-export function openCrispChat() {
-  const s = loadSdk();
-  if (!s) return;
-  try {
-    // The package's default export is a function that opens the chat.
-    const open = s.default || s.show;
-    if (typeof open === "function") {
-      open();
-    } else {
-      console.warn("[crisp] no callable default export found on SDK");
-    }
+    const url = `https://go.crisp.chat/chat/embed/?${params.toString()}`;
+
+    await WebBrowser.openBrowserAsync(url, {
+      // Match KafuDeal's orange so the in-app browser chrome doesn't look out of place
+      toolbarColor: "#FF6B2C",
+      controlsColor: "#FFFFFF",
+      dismissButtonStyle: "close",
+      enableBarCollapsing: false,
+    });
   } catch (e) {
     console.warn("[crisp] open failed", e);
   }
