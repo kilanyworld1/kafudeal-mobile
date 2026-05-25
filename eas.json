@@ -20,6 +20,12 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "appleId": "mo@kafudeal.com",
+        "ascAppId": "6772335272",
+        "appleTeamId": "TR953DC8KY"
+      }
+    }
   }
 }
