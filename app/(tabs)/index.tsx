@@ -509,7 +509,8 @@ const s = StyleSheet.create({
   actionsRow: {
     flexDirection: "row", gap: 10, alignItems: "center",
     marginLeft: "auto",
-    zIndex: 30, elevation: 30,
+    // High stack so taps never fall through to the category strip below.
+    zIndex: 100, elevation: 100,
   },
   iconBtn: {
     width: 40, height: 40, borderRadius: 20,

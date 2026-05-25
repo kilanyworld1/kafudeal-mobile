@@ -95,7 +95,7 @@ export const productsAPI = {
           `
           *,
           categories(id, name, icon),
-          partners(id, name, logo_url, domain, initials, color, bg_color, accent_color, email)
+          partners(id, name, logo_url, domain, initials, color, bg_color, accent_color, email:contact_email)
         `
         )
         .eq("id", id)
@@ -465,7 +465,8 @@ export const ordersAPI = {
             item_count: cartItems.length,
             subtotal,
             total: subtotal,
-            order_status: "new",
+            // Orders land as 'confirmed' immediately — admin progresses from there.
+            order_status: "confirmed",
             payment_status: "pending",
             ...orderData,
           },

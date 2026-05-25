@@ -53,8 +53,10 @@ export default function HeaderIconButton({
         onPress={onPress}
         onPressIn={pressIn}
         onPressOut={pressOut}
-        // Generous tap area — the icon is ~20px but the touch zone is ~80px now
-        hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+        // Small symmetric hitSlop — the visible button is already 44px which is
+        // a comfortable tap target. Bigger hitSlop was stealing taps from the
+        // category chips below the banner on smaller phones.
+        hitSlop={6}
         android_ripple={{ color: "rgba(255,255,255,0.15)", borderless: true, radius: size }}
       >
         <Animated.View
@@ -106,10 +108,11 @@ export default function HeaderIconButton({
 }
 
 const s = StyleSheet.create({
-  // Stack above the gradient banner so the entire hitSlop receives taps
+  // Stack above the gradient banner AND the category strip below it so taps
+  // always reach this button. Elevation matters on Android, zIndex on iOS.
   wrap: {
-    zIndex: 20,
-    elevation: 20,
+    zIndex: 50,
+    elevation: 50,
   },
   dot: {
     position: "absolute",

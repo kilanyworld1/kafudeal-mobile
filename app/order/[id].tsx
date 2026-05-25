@@ -8,6 +8,7 @@ import { ordersAPI } from "../../lib/api";
 import { transformOrder } from "../../lib/transformers";
 import { supabase } from "../../lib/supabase";
 import type { Order } from "../../lib/types";
+import { openCrispChat } from "../../lib/crisp";
 
 const STEPS = [
   // 'new' rows from older orders still map to step 0 so the tracker isn't blank
@@ -38,20 +39,32 @@ export default function OrderTracking() {
   const step = order ? statusToStepIndex(order.status) : 0;
   const cancelled = order?.status?.toLowerCase() === "cancelled";
 
+  // Driver-marker pulse — runs continuously while the screen is mounted
   useEffect(() => {
-    Animated.loop(
+    const driverLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(driverPulse, { toValue: 1, duration: 1000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
         Animated.timing(driverPulse, { toValue: 0, duration: 1000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
       ])
-    ).start();
-    Animated.loop(
+    );
+    driverLoop.start();
+    return () => driverLoop.stop();
+  }, []);
+
+  // "Now" pulse on the active step — RESTART whenever step changes so the native
+  // driver re-binds to the newly-mounted halo view (otherwise the animation
+  // freezes after a realtime status update).
+  useEffect(() => {
+    nowPulse.setValue(0);
+    const nowLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(nowPulse, { toValue: 1, duration: 900, useNativeDriver: true }),
         Animated.timing(nowPulse, { toValue: 0, duration: 700, useNativeDriver: true }),
       ])
-    ).start();
-  }, []);
+    );
+    nowLoop.start();
+    return () => nowLoop.stop();
+  }, [step]);
 
   useEffect(() => {
     Animated.timing(progressAnim, {
@@ -181,6 +194,7 @@ export default function OrderTracking() {
                     <View style={[s.dot, done && s.dotDone, now && s.dotNow]}>
                       {now && (
                         <Animated.View
+                          key={`halo-${step}`}
                           pointerEvents="none"
                           style={[
                             s.nowHalo,
@@ -260,7 +274,7 @@ export default function OrderTracking() {
         )}
 
         {!cancelled && (
-          <Pressable style={s.chatCard}>
+          <Pressable onPress={openCrispChat} style={s.chatCard}>
             <View style={s.chatIcon}>
               <Ionicons name="chatbubble-ellipses" size={20} color="#FF6B2C" />
             </View>
@@ -301,7 +315,7 @@ export default function OrderTracking() {
           </View>
         </View>
 
-        <Pressable style={s.helpBtn}>
+        <Pressable onPress={openCrispChat} style={s.helpBtn}>
           <Ionicons name="help-circle-outline" size={18} color="#FF6B2C" />
           <Text style={s.helpBtnText}>Need help with this order?</Text>
         </Pressable>

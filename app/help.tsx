@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
+import { View, Text, ScrollView, Pressable, StyleSheet, Linking } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
+import { openCrispChat } from "../lib/crisp";
 
 const topics = [
   { icon: "cube-outline" as const, label: "My orders", sub: "Track, modify, return" },
@@ -49,12 +50,18 @@ export default function Help() {
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
         {/* Quick contact */}
         <View style={s.contactRow}>
-          <Pressable style={[s.contactCard, { backgroundColor: "#FF6B2C" }]}>
+          <Pressable
+            onPress={openCrispChat}
+            style={[s.contactCard, { backgroundColor: "#FF6B2C" }]}
+          >
             <Ionicons name="chatbubble-ellipses" size={22} color="white" />
             <Text style={s.contactTitle}>Chat with us</Text>
             <Text style={s.contactSub}>Avg reply &lt; 2 min</Text>
           </Pressable>
-          <Pressable style={[s.contactCard, { backgroundColor: "white" }]}>
+          <Pressable
+            onPress={() => Linking.openURL("tel:+9718005238")}
+            style={[s.contactCard, { backgroundColor: "white" }]}
+          >
             <Ionicons name="call" size={22} color="#FF6B2C" />
             <Text style={[s.contactTitle, { color: "#0F172A" }]}>Call us</Text>
             <Text style={[s.contactSub, { color: "#64748B" }]}>+971 800 KAFU</Text>
@@ -103,7 +110,7 @@ export default function Help() {
         <View style={s.footerCard}>
           <Text style={s.footerTitle}>Still need help?</Text>
           <Text style={s.footerSub}>Our team is online 7 days a week.</Text>
-          <Pressable style={s.footerBtn}>
+          <Pressable onPress={openCrispChat} style={s.footerBtn}>
             <Text style={s.footerBtnText}>Start a chat</Text>
           </Pressable>
         </View>

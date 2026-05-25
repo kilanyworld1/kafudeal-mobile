@@ -1,11 +1,19 @@
+import { useEffect } from "react";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { AuthProvider } from "../lib/auth-context";
 import { CartProvider } from "../lib/cart-context";
 import { NotificationsProvider } from "../lib/notifications-context";
+import { initCrisp } from "../lib/crisp";
 
 export default function RootLayout() {
+  // Initialise Crisp once when the app boots. Identity gets attached later in
+  // AuthProvider when we know who the customer is.
+  useEffect(() => {
+    initCrisp();
+  }, []);
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthProvider>

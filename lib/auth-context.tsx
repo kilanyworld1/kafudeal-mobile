@@ -7,6 +7,7 @@ import { supabase } from "./supabase";
 import { authAPI } from "./api";
 import { transformCustomer } from "./transformers";
 import type { Customer } from "./types";
+import { identifyCrispUser, resetCrispSession } from "./crisp";
 
 type AuthContextValue = {
   session: Session | null;
@@ -47,6 +48,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!session?.user) {
       setCustomer(null);
+      // No active session — wipe the Crisp identity so the next user starts fresh.
+      resetCrispSession();
       return;
     }
     let cancelled = false;
@@ -55,7 +58,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const { data } = await authAPI.getProfile();
         if (cancelled) return;
         if (data) {
-          setCustomer(transformCustomer(data));
+          const c = transformCustomer(data);
+          setCustomer(c);
+          // Attach the signed-in customer to Crisp so support sees their name/email.
+          identifyCrispUser(c);
           return;
         }
         // wait a bit for the trigger to fire on first signup
