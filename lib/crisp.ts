@@ -48,7 +48,8 @@ export async function openCrispChat() {
     if (currentCustomer?.email) params.set("user_email", currentCustomer.email);
     if (currentCustomer?.fullName) params.set("user_nickname", currentCustomer.fullName);
     if (currentCustomer?.phone) params.set("user_phone", currentCustomer.phone);
-    if (currentCustomer?.id) params.set("user_token", String(currentCustomer.id));
+    // Per Crisp support — the documented param is `token_id`, not `user_token`.
+    if (currentCustomer?.id) params.set("token_id", String(currentCustomer.id));
 
     const url = `https://go.crisp.chat/chat/embed/?${params.toString()}`;
 

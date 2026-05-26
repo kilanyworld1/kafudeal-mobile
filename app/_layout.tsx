@@ -2,17 +2,32 @@ import { useEffect } from "react";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { useFonts } from "expo-font";
+import { Ionicons } from "@expo/vector-icons";
 import { AuthProvider } from "../lib/auth-context";
 import { CartProvider } from "../lib/cart-context";
 import { NotificationsProvider } from "../lib/notifications-context";
 import { initCrisp } from "../lib/crisp";
 
 export default function RootLayout() {
+  // Explicitly load Ionicons font. In Expo SDK 52 with the new architecture,
+  // @expo/vector-icons' built-in font auto-registration can fail to fire when
+  // the native dependency tree shifts (which happened when we added
+  // expo-apple-authentication + expo-asset). Loading the font here guarantees
+  // it's available before any <Ionicons /> renders.
+  const [fontsLoaded] = useFonts({
+    ...Ionicons.font,
+  });
+
   // Initialise Crisp once when the app boots. Identity gets attached later in
   // AuthProvider when we know who the customer is.
   useEffect(() => {
     initCrisp();
   }, []);
+
+  if (!fontsLoaded) {
+    return null;
+  }
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
