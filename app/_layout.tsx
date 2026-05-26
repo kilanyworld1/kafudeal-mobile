@@ -10,24 +10,17 @@ import { NotificationsProvider } from "../lib/notifications-context";
 import { initCrisp } from "../lib/crisp";
 
 export default function RootLayout() {
-  // Explicitly load Ionicons font. In Expo SDK 52 with the new architecture,
-  // @expo/vector-icons' built-in font auto-registration can fail to fire when
-  // the native dependency tree shifts (which happened when we added
-  // expo-apple-authentication + expo-asset). Loading the font here guarantees
-  // it's available before any <Ionicons /> renders.
-  const [fontsLoaded] = useFonts({
-    ...Ionicons.font,
-  });
+  // Load Ionicons font explicitly. Expo SDK 52's auto-registration sometimes
+  // fails when native deps shift. We intentionally DON'T block the render here
+  // — if fonts are still loading, icons just appear with a tiny pop-in. This
+  // is way better than a blank-screen failure mode.
+  useFonts({ ...Ionicons.font });
 
   // Initialise Crisp once when the app boots. Identity gets attached later in
   // AuthProvider when we know who the customer is.
   useEffect(() => {
     initCrisp();
   }, []);
-
-  if (!fontsLoaded) {
-    return null;
-  }
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
