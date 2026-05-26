@@ -32,46 +32,68 @@ export default function Orders() {
   const lastFetchRef = useRef(0);
 
   const fetchOrders = useCallback(async () => {
-    if (!customer?.id) {
-      setOrders([]);
-      return;
-    }
+    if (!customer?.id) return;
     const { data } = await ordersAPI.getMyOrders({ from: 0, to: 49 });
     setOrders((data || []).map(transformOrder));
     lastFetchRef.current = Date.now();
   }, [customer?.id]);
 
+  // Single source of truth for the screen's lifecycle vs. auth state.
+  // - Signed out → reset everything, no loading
+  // - Signed in but customer profile still loading → show spinner
+  // - Signed in + customer loaded → fetch orders
+  // The `lastFetchRef` is reset to 0 here so a fresh focus on this tab after
+  // re-auth always triggers a refetch (no throttle leakage across sessions).
   useEffect(() => {
-    (async () => {
-      setLoading(true);
-      await fetchOrders();
+    if (!user) {
+      setOrders([]);
       setLoading(false);
+      lastFetchRef.current = 0;
+      return;
+    }
+    if (!customer?.id) {
+      // Auth context is still pulling the customer profile — show loading
+      setLoading(true);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    (async () => {
+      await fetchOrders();
+      if (!cancelled) setLoading(false);
     })();
-  }, [fetchOrders]);
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, customer?.id, fetchOrders]);
 
   // Refetch on focus, but skip if we fetched within the last 10 seconds
   // (so flipping between tabs doesn't hammer the API)
   useFocusEffect(
     useCallback(() => {
+      if (!customer?.id) return;
       if (Date.now() - lastFetchRef.current > 10000) {
         fetchOrders();
       }
-    }, [fetchOrders])
+    }, [customer?.id, fetchOrders])
   );
 
-  // Realtime: refetch when ANY of this customer's orders change
+  // Realtime: refetch when ANY of this customer's orders change.
+  // Channel name includes user.id too so re-auth produces a fresh channel.
   useEffect(() => {
     if (!customer?.id) return;
     const channel = supabase
-      .channel(`orders-${customer.id}`)
+      .channel(`orders-${customer.id}-${user?.id ?? "anon"}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "orders", filter: `customer_id=eq.${customer.id}` },
         () => fetchOrders()
       )
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [customer?.id, fetchOrders]);
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [customer?.id, user?.id, fetchOrders]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);

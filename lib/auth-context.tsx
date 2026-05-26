@@ -1,7 +1,8 @@
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from "react";
-import { Alert } from "react-native";
+import { Alert, Platform } from "react-native";
 import * as WebBrowser from "expo-web-browser";
 import * as Linking from "expo-linking";
+import * as AppleAuthentication from "expo-apple-authentication";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 import { authAPI } from "./api";
@@ -120,8 +121,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signInWithGoogle = useCallback(() => signInWithProvider("google"), [signInWithProvider]);
-  const signInWithApple = useCallback(() => signInWithProvider("apple"), [signInWithProvider]);
   const signInWithFacebook = useCallback(() => signInWithProvider("facebook"), [signInWithProvider]);
+
+  /**
+   * Apple sign-in uses the NATIVE iOS Sign-In flow (Face ID overlay), not the
+   * web OAuth flow. This matches Apple's UX guidelines, avoids the 6-month
+   * JWT rotation, and is what App Store reviewers expect to see.
+   * iOS-only — on Android we'd fall back to OAuth, but currently there's no
+   * Apple sign-in button shown on Android since most Android users wouldn't
+   * have an Apple ID anyway.
+   */
+  const signInWithApple = useCallback(async () => {
+    if (Platform.OS !== "ios") {
+      Alert.alert("Sign in with Apple", "Available on iOS devices only.");
+      return;
+    }
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+      if (!credential.identityToken) {
+        throw new Error("No identity token returned from Apple");
+      }
+      const { error } = await supabase.auth.signInWithIdToken({
+        provider: "apple",
+        token: credential.identityToken,
+      });
+      if (error) throw error;
+    } catch (e: any) {
+      // User cancelled — silent, that's expected
+      if (e?.code === "ERR_REQUEST_CANCELED") return;
+      console.warn("Apple sign-in error:", e?.message || e);
+      Alert.alert("Sign-in failed", e?.message || "Please try again.");
+    }
+  }, []);
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();

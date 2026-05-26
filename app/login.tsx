@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { View, Text, Pressable, ScrollView, StyleSheet, Animated, Easing, ActivityIndicator } from "react-native";
+import { View, Text, Pressable, ScrollView, StyleSheet, Animated, Easing, ActivityIndicator, Platform } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as AppleAuthentication from "expo-apple-authentication";
+import * as WebBrowser from "expo-web-browser";
 import KafuMark from "../components/KafuMark";
 import { useAuth } from "../lib/auth-context";
 
@@ -74,8 +76,7 @@ export default function Login() {
             ))}
           </View>
 
-          {/* Social buttons — only Google for now. Apple + Facebook
-              will be re-enabled once the providers are configured in Supabase. */}
+          {/* Google first (universal), then Apple below (iOS-only). */}
           <Pressable
             onPress={() => handle("google")}
             disabled={busy !== null}
@@ -91,11 +92,26 @@ export default function Login() {
             )}
           </Pressable>
 
-          <View style={s.comingSoonRow}>
-            <View style={s.comingSoonChip}>
-              <AppleLogo dark />
-              <Text style={s.comingSoonText}>Apple</Text>
+          {/* Apple's official button — guarantees HIG compliance (no rejection) */}
+          {Platform.OS === "ios" && (
+            <View style={s.appleBtnWrap}>
+              {busy === "apple" ? (
+                <View style={[s.appleBtnFallback]}>
+                  <ActivityIndicator color="white" />
+                </View>
+              ) : (
+                <AppleAuthentication.AppleAuthenticationButton
+                  buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+                  buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+                  cornerRadius={14}
+                  style={s.appleBtn}
+                  onPress={() => handle("apple")}
+                />
+              )}
             </View>
+          )}
+
+          <View style={s.comingSoonRow}>
             <View style={s.comingSoonChip}>
               <FacebookLogo dark />
               <Text style={s.comingSoonText}>Facebook</Text>
@@ -105,7 +121,19 @@ export default function Login() {
 
           <Text style={s.terms}>
             By continuing you agree to our{"\n"}
-            <Text style={s.termsLink}>Terms</Text> and <Text style={s.termsLink}>Privacy Policy</Text>
+            <Text
+              style={s.termsLink}
+              onPress={() => WebBrowser.openBrowserAsync("https://kafudeal.com/terms.html")}
+            >
+              Terms
+            </Text>
+            {" and "}
+            <Text
+              style={s.termsLink}
+              onPress={() => WebBrowser.openBrowserAsync("https://kafudeal.com/privacy.html")}
+            >
+              Privacy Policy
+            </Text>
           </Text>
         </View>
       </ScrollView>
@@ -166,8 +194,8 @@ function FloatingEmoji({
 
 function AppleLogo({ dark }: { dark?: boolean } = {}) {
   return (
-    <Svg width={16} height={16} viewBox="0 0 24 24" fill={dark ? "#0F172A" : "white"}>
-      <Path d="M17.5 12.5c0-3 2.4-5.5 5.5-5.5-1.6-2.4-4.4-4-7.5-4-2 0-3.9.7-5.4 1.9-1.5-1.2-3.4-1.9-5.4-1.9C2.4 3 0 5.5 0 8.5c0 4.7 5.6 11.4 9 14.5 1.4 1.3 3.6 1.3 5 0 .8-.7 1.7-1.6 2.6-2.6-1.4-2.5-2.1-5.3-2.1-7.9z" />
+    <Svg width={18} height={20} viewBox="0 0 384 512" fill={dark ? "#0F172A" : "white"}>
+      <Path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z" />
     </Svg>
   );
 }
@@ -234,6 +262,17 @@ const s = StyleSheet.create({
   socialBtnOutline: {
     backgroundColor: "white",
     borderWidth: 1.5, borderColor: "rgba(15,23,42,0.12)",
+  },
+  // Apple's native button container — uses HIG-mandated height (50pt) and matches
+  // the spacing of the other social buttons.
+  appleBtnWrap: { marginBottom: 10 },
+  appleBtn: { width: "100%", height: 50 },
+  // Fallback shown only during the brief moment the button is busy (Apple's
+  // component doesn't have a built-in loading state).
+  appleBtnFallback: {
+    width: "100%", height: 50, borderRadius: 14,
+    backgroundColor: "#0F172A",
+    alignItems: "center", justifyContent: "center",
   },
   socialText: { fontSize: 14.5, fontWeight: "800", color: "#0F172A" },
   comingSoonRow: {
