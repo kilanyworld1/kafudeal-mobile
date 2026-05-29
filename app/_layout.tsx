@@ -3,21 +3,22 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useFonts } from "expo-font";
-import { Ionicons } from "@expo/vector-icons";
 import { AuthProvider } from "../lib/auth-context";
 import { CartProvider } from "../lib/cart-context";
 import { NotificationsProvider } from "../lib/notifications-context";
 import { initCrisp } from "../lib/crisp";
 
+// IMPORTANT: hoist the font require to module top-level so Metro detects it
+// statically and includes the .ttf in the bundle. Putting require() inside a
+// function call (like useFonts({...})) sometimes hides it from Metro's static
+// analyzer, which is why the font wasn't getting bundled in earlier builds.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const IONICONS_FONT = require("@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf");
+
 export default function RootLayout() {
-  // Load Ionicons font via explicit require so Metro definitely bundles the .ttf.
-  // The {...Ionicons.font} pattern alone wasn't bundling the asset in production
-  // builds on SDK 52 with new architecture — explicit require fixes that.
-  // Non-blocking: app still renders if fonts haven't arrived yet.
-  useFonts({
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    Ionicons: require("@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf"),
-  });
+  // Load Ionicons font. The require is hoisted above so Metro definitely
+  // bundles the asset. Non-blocking: app renders even if fonts haven't loaded yet.
+  useFonts({ Ionicons: IONICONS_FONT });
 
   // Initialise Crisp once when the app boots. Identity gets attached later in
   // AuthProvider when we know who the customer is.
