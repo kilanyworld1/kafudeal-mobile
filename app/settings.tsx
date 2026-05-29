@@ -1,22 +1,100 @@
 import { useState } from "react";
-import { View, Text, ScrollView, Pressable, Switch, StyleSheet } from "react-native";
+import { View, Text, ScrollView, Pressable, Switch, StyleSheet, Alert, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
+import * as WebBrowser from "expo-web-browser";
+import { useAuth } from "../lib/auth-context";
+import { deleteMyAccount } from "../lib/account-deletion";
 
 export default function Settings() {
   const insets = useSafeAreaInsets();
+  const { user, signOut } = useAuth();
   const [pushOrder, setPushOrder] = useState(true);
   const [pushDeals, setPushDeals] = useState(true);
   const [pushNews, setPushNews] = useState(false);
   const [email, setEmail] = useState(true);
   const [sms, setSms] = useState(false);
   const [biometric, setBiometric] = useState(true);
+  const [deleting, setDeleting] = useState(false);
+
+  const comingSoon = (feature: string) =>
+    Alert.alert(`${feature}`, "Coming soon — we're working on this.");
+
+  const openTerms = () => WebBrowser.openBrowserAsync("https://kafudeal.com/terms.html");
+  const openPrivacy = () => WebBrowser.openBrowserAsync("https://kafudeal.com/privacy.html");
+
+  const handleSignOut = () => {
+    Alert.alert("Sign out", "Are you sure you want to sign out?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Sign out",
+        style: "destructive",
+        onPress: async () => {
+          await signOut();
+          router.replace("/(tabs)");
+        },
+      },
+    ]);
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      "Delete account",
+      "This will permanently delete your account, profile, cart, saved items, and notifications. Past orders will be kept in our records for legal and accounting purposes but will no longer be linked to your account.\n\nThis cannot be undone. Are you sure?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            // Second confirmation to prevent accidental deletion
+            Alert.alert(
+              "Final confirmation",
+              "Type-confirm not required, but this is your last chance. Delete account?",
+              [
+                { text: "Cancel", style: "cancel" },
+                {
+                  text: "Yes, delete forever",
+                  style: "destructive",
+                  onPress: async () => {
+                    setDeleting(true);
+                    const { error } = await deleteMyAccount();
+                    setDeleting(false);
+                    if (error) {
+                      Alert.alert(
+                        "Couldn't delete account",
+                        `${error}\n\nIf this keeps happening, email support@kafudeal.com and we'll process the deletion manually.`
+                      );
+                      return;
+                    }
+                    Alert.alert(
+                      "Account deleted",
+                      "Your account and all associated data have been deleted. Sorry to see you go 👋",
+                      [
+                        {
+                          text: "OK",
+                          onPress: async () => {
+                            await signOut();
+                            router.replace("/(tabs)");
+                          },
+                        },
+                      ]
+                    );
+                  },
+                },
+              ]
+            );
+          },
+        },
+      ]
+    );
+  };
 
   return (
     <View style={s.root}>
       <View style={[s.topBar, { paddingTop: insets.top + 8 }]}>
-        <Pressable onPress={() => router.back()} style={s.iconBtn}>
+        <Pressable onPress={() => router.back()} style={s.iconBtn} hitSlop={12}>
           <Ionicons name="chevron-back" size={24} color="#0F172A" />
         </Pressable>
         <Text style={s.topTitle}>Settings</Text>
@@ -27,9 +105,16 @@ export default function Settings() {
         {/* Account */}
         <Text style={s.section}>ACCOUNT</Text>
         <View style={s.group}>
-          <Row icon="person-outline" label="Personal info" />
-          <Row icon="lock-closed-outline" label="Password & security" />
-          <Row icon="finger-print-outline" label="Use biometric login" toggle value={biometric} onChange={setBiometric} last />
+          <Row icon="person-outline" label="Personal info" onPress={() => comingSoon("Personal info")} />
+          <Row icon="lock-closed-outline" label="Password & security" onPress={() => comingSoon("Password & security")} />
+          <Row
+            icon="finger-print-outline"
+            label="Use biometric login"
+            toggle
+            value={biometric}
+            onChange={setBiometric}
+            last
+          />
         </View>
 
         {/* Notifications */}
@@ -49,23 +134,58 @@ export default function Settings() {
         {/* Preferences */}
         <Text style={s.section}>PREFERENCES</Text>
         <View style={s.group}>
-          <Row icon="language-outline" label="Language" value2="English" />
-          <Row icon="cash-outline" label="Currency" value2="AED" />
-          <Row icon="moon-outline" label="Theme" value2="Light" last />
+          <Row icon="language-outline" label="Language" value2="English" onPress={() => comingSoon("Language")} />
+          <Row icon="cash-outline" label="Currency" value2="AED" onPress={() => comingSoon("Currency")} />
+          <Row icon="moon-outline" label="Theme" value2="Light" onPress={() => comingSoon("Theme")} last />
         </View>
 
         {/* Legal */}
         <Text style={s.section}>LEGAL</Text>
         <View style={s.group}>
-          <Row icon="document-text-outline" label="Terms of service" />
-          <Row icon="shield-outline" label="Privacy policy" />
-          <Row icon="information-circle-outline" label="About KafuDeal" value2="v0.1.0" last />
+          <Row icon="document-text-outline" label="Terms of service" onPress={openTerms} />
+          <Row icon="shield-outline" label="Privacy policy" onPress={openPrivacy} />
+          <Row
+            icon="information-circle-outline"
+            label="About KafuDeal"
+            value2="v0.11.0"
+            onPress={() =>
+              Alert.alert(
+                "About KafuDeal",
+                "KafuDeal v0.11.0\nMade with 💛 in the UAE\n\nWe rescue near-expiry groceries from waste and pass the savings to you."
+              )
+            }
+            last
+          />
         </View>
 
-        <Pressable style={s.logoutBtn}>
-          <Ionicons name="log-out-outline" size={20} color="#DC2626" />
-          <Text style={s.logoutText}>Sign out</Text>
-        </Pressable>
+        {user && (
+          <>
+            <Pressable onPress={handleSignOut} style={s.signoutBtn} disabled={deleting}>
+              <Ionicons name="log-out-outline" size={20} color="#DC2626" />
+              <Text style={s.signoutText}>Sign out</Text>
+            </Pressable>
+
+            {/* Account deletion required by Apple App Store guideline 5.1.1(v) */}
+            <Pressable
+              onPress={handleDeleteAccount}
+              style={s.deleteBtn}
+              disabled={deleting}
+            >
+              {deleting ? (
+                <ActivityIndicator color="#DC2626" />
+              ) : (
+                <>
+                  <Ionicons name="trash-outline" size={18} color="#DC2626" />
+                  <Text style={s.deleteText}>Delete my account</Text>
+                </>
+              )}
+            </Pressable>
+            <Text style={s.deleteHelp}>
+              Permanently removes your account and personal data. Past orders are
+              anonymized for legal record-keeping. Cannot be undone.
+            </Text>
+          </>
+        )}
 
         <Text style={s.footer}>Made with 💛 in the UAE</Text>
       </ScrollView>
@@ -74,14 +194,26 @@ export default function Settings() {
 }
 
 function Row({
-  icon, label, toggle, value, onChange, value2, last,
+  icon,
+  label,
+  toggle,
+  value,
+  onChange,
+  value2,
+  last,
+  onPress,
 }: {
-  icon: any; label: string;
-  toggle?: boolean; value?: boolean; onChange?: (v: boolean) => void;
-  value2?: string; last?: boolean;
+  icon: any;
+  label: string;
+  toggle?: boolean;
+  value?: boolean;
+  onChange?: (v: boolean) => void;
+  value2?: string;
+  last?: boolean;
+  onPress?: () => void;
 }) {
   return (
-    <Pressable style={[s.row, !last && s.rowBorder]}>
+    <Pressable onPress={onPress} style={[s.row, !last && s.rowBorder]}>
       <Ionicons name={icon} size={20} color="#64748B" style={{ marginRight: 14 }} />
       <Text style={s.rowLabel}>{label}</Text>
       {toggle ? (
@@ -119,12 +251,22 @@ const s = StyleSheet.create({
   rowBorder: { borderBottomWidth: 0.5, borderBottomColor: "rgba(15,23,42,0.06)" },
   rowLabel: { flex: 1, fontSize: 14, color: "#0F172A", fontWeight: "600" },
   rowValue: { fontSize: 13, color: "#64748B", marginRight: 6 },
-  logoutBtn: {
+  signoutBtn: {
     flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
     marginHorizontal: 16, marginTop: 24, padding: 14,
     backgroundColor: "white", borderRadius: 12,
     borderWidth: 1, borderColor: "rgba(220,38,38,0.20)",
   },
-  logoutText: { color: "#DC2626", fontSize: 14, fontWeight: "800" },
+  signoutText: { color: "#DC2626", fontSize: 14, fontWeight: "800" },
+  deleteBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+    marginHorizontal: 16, marginTop: 12, padding: 14,
+    backgroundColor: "#FEE2E2", borderRadius: 12,
+  },
+  deleteText: { color: "#DC2626", fontSize: 14, fontWeight: "800" },
+  deleteHelp: {
+    fontSize: 11, color: "#94A3B8", textAlign: "center",
+    paddingHorizontal: 32, marginTop: 8, lineHeight: 16,
+  },
   footer: { textAlign: "center", color: "#94A3B8", fontSize: 11, marginTop: 24 },
 });

@@ -10,11 +10,14 @@ import { NotificationsProvider } from "../lib/notifications-context";
 import { initCrisp } from "../lib/crisp";
 
 export default function RootLayout() {
-  // Load Ionicons font explicitly. Expo SDK 52's auto-registration sometimes
-  // fails when native deps shift. We intentionally DON'T block the render here
-  // — if fonts are still loading, icons just appear with a tiny pop-in. This
-  // is way better than a blank-screen failure mode.
-  useFonts({ ...Ionicons.font });
+  // Load Ionicons font via explicit require so Metro definitely bundles the .ttf.
+  // The {...Ionicons.font} pattern alone wasn't bundling the asset in production
+  // builds on SDK 52 with new architecture — explicit require fixes that.
+  // Non-blocking: app still renders if fonts haven't arrived yet.
+  useFonts({
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    Ionicons: require("@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf"),
+  });
 
   // Initialise Crisp once when the app boots. Identity gets attached later in
   // AuthProvider when we know who the customer is.
