@@ -7,6 +7,13 @@ import { supabase } from "../lib/supabase";
 // This route catches the deep link returned from Supabase OAuth (kafudeal://auth-callback).
 // In practice, the auth-context.tsx handler that opens WebBrowser usually finishes the
 // session-set first and this route just acts as a safety net.
+//
+// Navigation rule: pop ourselves off the stack when done. If we got here mid-flow
+// (the typical case: /checkout → /login → /auth-callback), router.back() drops us
+// back onto /login. /login.tsx then dismisses itself when it sees the new session,
+// landing the user on /checkout. router.replace("/(tabs)") used to be wrong here —
+// it left /login lingering UNDERNEATH the replace target, and tapping Back from
+// the next screen surfaced /login again.
 export default function AuthCallback() {
   useEffect(() => {
     (async () => {
@@ -32,7 +39,14 @@ export default function AuthCallback() {
       } catch (e) {
         console.warn("Auth callback error", e);
       } finally {
-        router.replace("/(tabs)");
+        // If we have a back stack (in-app OAuth), pop ourselves off and let
+        // /login dismiss itself. Otherwise this was a cold deep link, so we
+        // need an explicit anchor — go home.
+        if (router.canGoBack()) {
+          router.back();
+        } else {
+          router.replace("/(tabs)");
+        }
       }
     })();
   }, []);
