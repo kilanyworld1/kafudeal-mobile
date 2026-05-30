@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TextInput, Pressable, StyleSheet, KeyboardAvoid
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
+import * as Location from "expo-location";
 import { addressesAPI } from "../lib/api";
 
 const labels = ["Home", "Work", "Other"];
@@ -19,8 +20,75 @@ export default function AddAddress() {
   const [notes, setNotes] = useState("");
   const [setDefault, setSetDefault] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [locating, setLocating] = useState(false);
 
   const canSave = building.length > 0 && area.length > 0 && phone.length > 0 && !saving;
+
+  // "Use my current location" — asks for permission, gets GPS coords, then
+  // reverse-geocodes to fill the form fields. User can still edit anything
+  // before saving. Falls back gracefully if permission denied / no GPS.
+  const useCurrentLocation = async () => {
+    try {
+      setLocating(true);
+
+      // 1. Ask permission (only when user explicitly tapped this button)
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        setLocating(false);
+        Alert.alert(
+          "Location permission needed",
+          "We can't get your address without location access. You can still type it in manually.",
+          [{ text: "OK" }]
+        );
+        return;
+      }
+
+      // 2. Get current position. `Balanced` is faster + uses less battery
+      // than `High`. Plenty accurate for an address.
+      const position = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      // 3. Reverse-geocode to a readable address (uses iOS / Android built-in,
+      // no Google API key needed)
+      const results = await Location.reverseGeocodeAsync({
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+      });
+
+      const place = results?.[0];
+      if (!place) {
+        setLocating(false);
+        Alert.alert(
+          "Couldn't read your address",
+          "We got your location but couldn't turn it into a street address. Please type it in.",
+          [{ text: "OK" }]
+        );
+        return;
+      }
+
+      // 4. Fill the form. We map the geocoder's fields onto ours:
+      //   - building / street name → Building
+      //   - district / sublocality → Area
+      //   - city → City
+      // Whatever's missing, the user can fill in.
+      const buildingParts = [place.name, place.street]
+        .filter(Boolean)
+        .filter((p, i, arr) => arr.indexOf(p) === i); // dedupe
+      if (buildingParts.length > 0) setBuilding(buildingParts.join(", "));
+      if (place.street) setStreet(place.street);
+      if (place.district || place.subregion) setArea(place.district || place.subregion || "");
+      if (place.city) setCity(place.city);
+
+      setLocating(false);
+    } catch (err: any) {
+      setLocating(false);
+      Alert.alert(
+        "Location error",
+        err?.message || "Couldn't get your location. Please type the address in."
+      );
+    }
+  };
 
   const handleSave = async () => {
     if (!canSave) return;
@@ -60,10 +128,26 @@ export default function AddAddress() {
         </View>
 
         <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 140 }}>
-          {/* Map preview */}
-          <View style={s.mapPreview}>
-            <Ionicons name="map" size={48} color="#FF6B2C" />
-            <Text style={s.mapText}>Tap to set pin on map</Text>
+          {/* "Use my current location" — auto-fills form via GPS + reverse-geocode */}
+          <Pressable
+            onPress={useCurrentLocation}
+            disabled={locating}
+            style={[s.locBtn, locating && { opacity: 0.6 }]}
+          >
+            {locating ? (
+              <ActivityIndicator color="#FF6B2C" />
+            ) : (
+              <>
+                <Ionicons name="locate" size={20} color="#FF6B2C" />
+                <Text style={s.locBtnText}>Use my current location</Text>
+              </>
+            )}
+          </Pressable>
+
+          <View style={s.orRow}>
+            <View style={s.orLine} />
+            <Text style={s.orText}>OR ENTER MANUALLY</Text>
+            <View style={s.orLine} />
           </View>
 
           {/* Label tabs */}
@@ -190,6 +274,17 @@ const s = StyleSheet.create({
     borderStyle: "dashed",
   },
   mapText: { color: "#64748B", fontSize: 12, fontWeight: "700", marginTop: 6 },
+  locBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+    paddingVertical: 14, borderRadius: 12,
+    borderWidth: 1.5, borderColor: "#FF6B2C",
+    backgroundColor: "#FFF4EC",
+    marginBottom: 16,
+  },
+  locBtnText: { color: "#FF6B2C", fontSize: 14, fontWeight: "800" },
+  orRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 8 },
+  orLine: { flex: 1, height: 1, backgroundColor: "rgba(15,23,42,0.08)" },
+  orText: { fontSize: 10, fontWeight: "800", color: "#94A3B8", letterSpacing: 0.6 },
   label: { fontSize: 12, fontWeight: "800", color: "#334155", marginBottom: 6, letterSpacing: 0.3, marginTop: 12 },
   tabRow: { flexDirection: "row", gap: 8, marginBottom: 4 },
   tab: {

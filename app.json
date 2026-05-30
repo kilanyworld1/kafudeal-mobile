@@ -2,7 +2,7 @@
   "expo": {
     "name": "KafuDeal",
     "slug": "kafudeal",
-    "version": "0.11.6",
+    "version": "0.11.7",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "kafudeal",
@@ -34,7 +34,13 @@
     },
     "plugins": [
       "expo-router",
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow KafuDeal to use your location to set your delivery address."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": false
