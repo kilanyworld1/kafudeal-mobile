@@ -903,6 +903,59 @@ export const addressesAPI = {
       return handleError(error);
     }
   },
+
+  // Delete one of the user's addresses. RLS makes sure they can only delete
+  // rows they own (customer_addresses_own_delete policy).
+  remove: async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from("customer_addresses")
+        .delete()
+        .eq("id", id);
+      if (error) return handleError(error);
+      return { data: null, error: null };
+    } catch (error) {
+      return handleError(error);
+    }
+  },
+
+  // Flip an address to default. Clears the default flag on every other row
+  // for this customer first so only one address is the default at a time.
+  setDefault: async (id: string) => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return handleError({ message: "Not signed in" });
+
+      const { data: customer } = await supabase
+        .from("customers")
+        .select("id")
+        .eq("auth_user_id", user.id)
+        .maybeSingle();
+      if (!customer) return handleError({ message: "Customer profile not found" });
+
+      // Clear default everywhere for this customer
+      await supabase
+        .from("customer_addresses")
+        .update({ is_default: false })
+        .eq("customer_id", customer.id)
+        .eq("is_default", true);
+
+      // Set the chosen one as default
+      const { data, error } = await supabase
+        .from("customer_addresses")
+        .update({ is_default: true })
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error) return handleError(error);
+      return { data, error: null };
+    } catch (error) {
+      return handleError(error);
+    }
+  },
 };
 
 

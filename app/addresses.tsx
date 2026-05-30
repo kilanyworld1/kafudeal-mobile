@@ -1,21 +1,85 @@
-import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
+import { useCallback, useState } from "react";
+import { View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
+import { addressesAPI } from "../lib/api";
 
-const addresses = [
-  {
-    id: "a1", label: "Home", line: "Marina Towers, Tower 3, Apt 1402",
-    area: "Dubai Marina · JLT", phone: "+971 50 123 4567", default: true, icon: "home" as const,
-  },
-  {
-    id: "a2", label: "Work", line: "Boulevard Plaza, Office 22, Floor 18",
-    area: "Downtown Dubai", phone: "+971 50 123 4567", default: false, icon: "briefcase" as const,
-  },
-];
+type Address = {
+  id: string;
+  label: string;
+  address_line: string;
+  city?: string | null;
+  emirate?: string | null;
+  phone?: string | null;
+  is_default?: boolean | null;
+};
+
+// Map UAE address label to a sensible icon
+const iconFor = (label?: string): "home" | "briefcase" | "location" => {
+  const l = (label || "").toLowerCase();
+  if (l === "home") return "home";
+  if (l === "work" || l === "office") return "briefcase";
+  return "location";
+};
 
 export default function Addresses() {
   const insets = useSafeAreaInsets();
+  const [addresses, setAddresses] = useState<Address[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // useFocusEffect: reload addresses every time the screen comes into focus.
+  // That covers "user added a new address and tapped Back" — the new row
+  // shows up without a manual refresh.
+  useFocusEffect(
+    useCallback(() => {
+      let alive = true;
+      (async () => {
+        setLoading(true);
+        const { data } = await addressesAPI.list();
+        if (!alive) return;
+        setAddresses((data || []) as Address[]);
+        setLoading(false);
+      })();
+      return () => {
+        alive = false;
+      };
+    }, [])
+  );
+
+  const handleDelete = (addr: Address) => {
+    Alert.alert(
+      "Delete address?",
+      `Remove "${addr.label}" from your saved addresses?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            const { error } = await addressesAPI.remove(addr.id);
+            if (error) {
+              Alert.alert("Couldn't delete", typeof error === "string" ? error : "Try again.");
+              return;
+            }
+            setAddresses((prev) => prev.filter((a) => a.id !== addr.id));
+          },
+        },
+      ]
+    );
+  };
+
+  const handleSetDefault = async (addr: Address) => {
+    const { error } = await addressesAPI.setDefault(addr.id);
+    if (error) {
+      Alert.alert("Couldn't update", typeof error === "string" ? error : "Try again.");
+      return;
+    }
+    // Optimistic update — flip is_default on the chosen row, off everywhere else
+    setAddresses((prev) =>
+      prev.map((a) => ({ ...a, is_default: a.id === addr.id }))
+    );
+  };
 
   return (
     <View style={s.root}>
@@ -28,45 +92,59 @@ export default function Addresses() {
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 120 }}>
-        {addresses.map((a) => (
-          <View key={a.id} style={s.card}>
-            <View style={s.cardHead}>
-              <View style={s.iconWrap}>
-                <Ionicons name={a.icon} size={20} color="#FF6B2C" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <View style={s.labelRow}>
-                  <Text style={s.label}>{a.label}</Text>
-                  {a.default && (
-                    <View style={s.defaultPill}>
-                      <Text style={s.defaultPillText}>DEFAULT</Text>
-                    </View>
-                  )}
-                </View>
-                <Text style={s.line}>{a.line}</Text>
-                <Text style={s.area}>{a.area}</Text>
-                <Text style={s.phone}>{a.phone}</Text>
-              </View>
-            </View>
-
-            <View style={s.cardActions}>
-              <Pressable style={s.actionBtn}>
-                <Ionicons name="create-outline" size={16} color="#0F172A" />
-                <Text style={s.actionText}>Edit</Text>
-              </Pressable>
-              {!a.default && (
-                <Pressable style={s.actionBtn}>
-                  <Ionicons name="star-outline" size={16} color="#0F172A" />
-                  <Text style={s.actionText}>Set default</Text>
-                </Pressable>
-              )}
-              <Pressable style={s.actionBtn}>
-                <Ionicons name="trash-outline" size={16} color="#DC2626" />
-                <Text style={[s.actionText, { color: "#DC2626" }]}>Delete</Text>
-              </Pressable>
-            </View>
+        {loading ? (
+          <View style={s.loadingBox}>
+            <ActivityIndicator color="#FF6B2C" />
           </View>
-        ))}
+        ) : addresses.length === 0 ? (
+          <View style={s.emptyBox}>
+            <Ionicons name="location-outline" size={36} color="#FF6B2C" />
+            <Text style={s.emptyTitle}>No saved addresses yet</Text>
+            <Text style={s.emptySub}>
+              Add an address so we can deliver your orders here.
+            </Text>
+          </View>
+        ) : (
+          addresses.map((a) => (
+            <View key={a.id} style={s.card}>
+              <View style={s.cardHead}>
+                <View style={s.iconWrap}>
+                  <Ionicons name={iconFor(a.label)} size={20} color="#FF6B2C" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <View style={s.labelRow}>
+                    <Text style={s.label}>{a.label}</Text>
+                    {a.is_default && (
+                      <View style={s.defaultPill}>
+                        <Text style={s.defaultPillText}>DEFAULT</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={s.line}>{a.address_line}</Text>
+                  {(a.city || a.emirate) ? (
+                    <Text style={s.area}>
+                      {[a.city, a.emirate].filter(Boolean).join(", ")}
+                    </Text>
+                  ) : null}
+                  {a.phone ? <Text style={s.phone}>{a.phone}</Text> : null}
+                </View>
+              </View>
+
+              <View style={s.cardActions}>
+                {!a.is_default && (
+                  <Pressable onPress={() => handleSetDefault(a)} style={s.actionBtn}>
+                    <Ionicons name="star-outline" size={16} color="#0F172A" />
+                    <Text style={s.actionText}>Set default</Text>
+                  </Pressable>
+                )}
+                <Pressable onPress={() => handleDelete(a)} style={s.actionBtn}>
+                  <Ionicons name="trash-outline" size={16} color="#DC2626" />
+                  <Text style={[s.actionText, { color: "#DC2626" }]}>Delete</Text>
+                </Pressable>
+              </View>
+            </View>
+          ))
+        )}
 
         <Pressable
           onPress={() => router.push("/add-address")}
@@ -90,6 +168,21 @@ const s = StyleSheet.create({
   },
   iconBtn: { padding: 6 },
   topTitle: { fontSize: 17, fontWeight: "800", color: "#0F172A" },
+  loadingBox: {
+    paddingVertical: 40, alignItems: "center", justifyContent: "center",
+  },
+  emptyBox: {
+    backgroundColor: "white", borderRadius: 14,
+    paddingVertical: 32, paddingHorizontal: 20,
+    alignItems: "center", justifyContent: "center",
+    marginBottom: 16,
+    borderWidth: 1, borderStyle: "dashed", borderColor: "rgba(255,107,44,0.30)",
+  },
+  emptyTitle: { fontSize: 15, fontWeight: "800", color: "#0F172A", marginTop: 10 },
+  emptySub: {
+    fontSize: 13, color: "#64748B", marginTop: 4, textAlign: "center",
+    maxWidth: 240,
+  },
   card: {
     backgroundColor: "white", borderRadius: 14, padding: 16, marginBottom: 12,
     shadowColor: "#0F172A", shadowOpacity: 0.04,
