@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { View, Text, Pressable, ScrollView, StyleSheet, Animated, Easing, ActivityIndicator, Platform } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import { Ionicons } from "@expo/vector-icons";
-import { router, useLocalSearchParams } from "expo-router";
+import { router } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as AppleAuthentication from "expo-apple-authentication";
@@ -23,21 +23,22 @@ export default function Login() {
   const { signInWithGoogle, signInWithApple, signInWithFacebook, session } = useAuth();
   const [busy, setBusy] = useState<"google" | "apple" | "facebook" | null>(null);
 
-  // Optional returnTo param — when a screen sends the user to login mid-flow
-  // (e.g. checkout asking them to sign in), we want to drop them back where
-  // they were instead of the tabs root. Pass it like:
-  //   router.push({ pathname: "/login", params: { returnTo: "/checkout" } });
-  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
-
-  // When session lands, close the modal
+  // When session lands, just close the modal. The screen underneath
+  // (checkout, account, wherever the user came from) stays in place
+  // and refreshes its own auth-dependent state via useFocusEffect.
+  //
+  // We use router.back() instead of router.replace so /login isn't
+  // left lingering in the navigation stack — that was causing the
+  // bug where tapping Back from /order/[id] dropped users back into
+  // the (now-stale) login screen.
   useEffect(() => {
     if (!session) return;
-    if (returnTo && typeof returnTo === "string" && returnTo.startsWith("/")) {
-      router.replace(returnTo as any);
+    if (router.canGoBack()) {
+      router.back();
     } else {
       router.replace("/(tabs)");
     }
-  }, [session, returnTo]);
+  }, [session]);
 
   const handle = async (which: "google" | "apple" | "facebook") => {
     setBusy(which);

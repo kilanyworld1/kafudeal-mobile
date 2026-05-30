@@ -78,14 +78,11 @@ export default function Checkout() {
         [
           { text: "Cancel", style: "cancel" },
           {
+            // router.push opens the login modal on top of this screen.
+            // When the user signs in, login.tsx calls router.back() which
+            // dismisses the modal and drops us right back here.
             text: "Sign in",
-            // Pass returnTo so the login screen drops the user back here
-            // instead of the tabs root once they finish signing in.
-            onPress: () =>
-              router.push({
-                pathname: "/login",
-                params: { returnTo: "/checkout" },
-              }),
+            onPress: () => router.push("/login"),
           },
         ]
       );
