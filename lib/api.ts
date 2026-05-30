@@ -831,6 +831,78 @@ export const addressesAPI = {
     ].filter((s) => s && String(s).trim().length > 0);
     return parts.join(" · ");
   },
+
+  // Save a new address. The form has more fields than the DB does, so we
+  // concatenate Building / Street / Area into a single `address_line` to
+  // match the existing schema. If `is_default` is true, we flip every other
+  // row of this customer to false first so only one default exists.
+  create: async (input: {
+    label?: string;
+    building?: string;
+    street?: string;
+    area?: string;
+    city?: string;
+    emirate?: string;
+    phone?: string;
+    is_default?: boolean;
+  }) => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return handleError({ message: "Not signed in" });
+
+      const { data: customer } = await supabase
+        .from("customers")
+        .select("id")
+        .eq("auth_user_id", user.id)
+        .maybeSingle();
+      if (!customer) return handleError({ message: "Customer profile not found" });
+
+      // Build a single readable address_line from the multi-field form
+      const address_line = [input.building, input.street, input.area]
+        .map((p) => (p || "").trim())
+        .filter(Boolean)
+        .join(", ");
+
+      if (!address_line) {
+        return handleError({ message: "Please fill in the building or street." });
+      }
+      if (!input.phone || input.phone.trim().length < 5) {
+        return handleError({ message: "Please add a contact phone number." });
+      }
+
+      // If this one is set as default, clear any existing default first.
+      if (input.is_default) {
+        await supabase
+          .from("customer_addresses")
+          .update({ is_default: false })
+          .eq("customer_id", customer.id)
+          .eq("is_default", true);
+      }
+
+      const { data, error } = await supabase
+        .from("customer_addresses")
+        .insert([
+          {
+            customer_id: customer.id,
+            label: input.label || "Home",
+            address_line,
+            city: input.city || null,
+            emirate: input.emirate || "Dubai",
+            phone: input.phone,
+            is_default: !!input.is_default,
+          },
+        ])
+        .select()
+        .single();
+
+      if (error) return handleError(error);
+      return { data, error: null };
+    } catch (error) {
+      return handleError(error);
+    }
+  },
 };
 
 

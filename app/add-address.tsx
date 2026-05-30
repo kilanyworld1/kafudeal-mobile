@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { View, Text, ScrollView, TextInput, Pressable, StyleSheet, KeyboardAvoidingView, Platform } from "react-native";
+import { View, Text, ScrollView, TextInput, Pressable, StyleSheet, KeyboardAvoidingView, Platform, Alert, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
+import { addressesAPI } from "../lib/api";
 
 const labels = ["Home", "Work", "Other"];
 
@@ -17,8 +18,35 @@ export default function AddAddress() {
   const [city, setCity] = useState("Dubai");
   const [notes, setNotes] = useState("");
   const [setDefault, setSetDefault] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const canSave = building.length > 0 && area.length > 0 && phone.length > 0;
+  const canSave = building.length > 0 && area.length > 0 && phone.length > 0 && !saving;
+
+  const handleSave = async () => {
+    if (!canSave) return;
+    setSaving(true);
+    const { error } = await addressesAPI.create({
+      label,
+      building,
+      street,
+      area,
+      city,
+      phone,
+      is_default: setDefault,
+    });
+    setSaving(false);
+
+    if (error) {
+      const msg =
+        typeof error === "string"
+          ? error
+          : (error as any)?.message || "Couldn't save the address. Please try again.";
+      Alert.alert("Couldn't save", msg);
+      return;
+    }
+
+    router.back();
+  };
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
@@ -128,11 +156,15 @@ export default function AddAddress() {
 
         <View style={[s.bottomBar, { paddingBottom: insets.bottom + 12 }]}>
           <Pressable
-            onPress={() => router.back()}
+            onPress={handleSave}
             style={[s.saveBtn, !canSave && { backgroundColor: "#FFD0B4" }]}
             disabled={!canSave}
           >
-            <Text style={s.saveBtnText}>Save address</Text>
+            {saving ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <Text style={s.saveBtnText}>Save address</Text>
+            )}
           </Pressable>
         </View>
       </View>
