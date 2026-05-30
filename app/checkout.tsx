@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { View, Text, ScrollView, Pressable, StyleSheet, Image, ActivityIndicator, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { useCart } from "../lib/cart-context";
 import { useAuth } from "../lib/auth-context";
 import { ordersAPI, addressesAPI } from "../lib/api";
@@ -37,27 +37,33 @@ export default function Checkout() {
   const [pay, setPay] = useState("p1");
   const [placing, setPlacing] = useState(false);
 
-  // Pull the customer's saved addresses on mount. If they haven't saved any
-  // we send them to /add-address — orders without a real address used to land
-  // in admin pointing at a hardcoded mock ("Marina Towers, Tower 3"), which
-  // obviously wouldn't work for real customers.
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      setLoadingAddresses(true);
-      const { data } = await addressesAPI.list();
-      if (!alive) return;
-      const list = (data || []) as Address[];
-      setAddresses(list);
-      // Auto-select the default address (or first if no default)
-      const def = list.find((a) => a.is_default) || list[0];
-      if (def) setAddrId(def.id);
-      setLoadingAddresses(false);
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [customer?.id]);
+  // Pull the customer's saved addresses every time the screen comes into
+  // focus. If we used a plain useEffect this would only run once, and
+  // adding a new address (via /add-address) wouldn't show up here when
+  // the user came back. useFocusEffect re-runs on every focus, so the
+  // freshly-saved address auto-selects in checkout.
+  useFocusEffect(
+    useCallback(() => {
+      let alive = true;
+      (async () => {
+        setLoadingAddresses(true);
+        const { data } = await addressesAPI.list();
+        if (!alive) return;
+        const list = (data || []) as Address[];
+        setAddresses(list);
+        // Pick default → most recently added → keep current selection if it's still in the list
+        setAddrId((prev) => {
+          if (prev && list.some((a) => a.id === prev)) return prev;
+          const def = list.find((a) => a.is_default) || list[0];
+          return def ? def.id : null;
+        });
+        setLoadingAddresses(false);
+      })();
+      return () => {
+        alive = false;
+      };
+    }, [customer?.id])
+  );
 
   const delivery = subtotal >= 100 ? 0 : 15;
   const total = Math.max(0, subtotal + delivery);
@@ -71,7 +77,16 @@ export default function Checkout() {
         "We'll save your cart and let you track the order. It only takes a few seconds.",
         [
           { text: "Cancel", style: "cancel" },
-          { text: "Sign in", onPress: () => router.push("/login") },
+          {
+            text: "Sign in",
+            // Pass returnTo so the login screen drops the user back here
+            // instead of the tabs root once they finish signing in.
+            onPress: () =>
+              router.push({
+                pathname: "/login",
+                params: { returnTo: "/checkout" },
+              }),
+          },
         ]
       );
       return;

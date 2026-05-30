@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { View, Text, Pressable, ScrollView, StyleSheet, Animated, Easing, ActivityIndicator, Platform } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as AppleAuthentication from "expo-apple-authentication";
@@ -23,10 +23,21 @@ export default function Login() {
   const { signInWithGoogle, signInWithApple, signInWithFacebook, session } = useAuth();
   const [busy, setBusy] = useState<"google" | "apple" | "facebook" | null>(null);
 
+  // Optional returnTo param — when a screen sends the user to login mid-flow
+  // (e.g. checkout asking them to sign in), we want to drop them back where
+  // they were instead of the tabs root. Pass it like:
+  //   router.push({ pathname: "/login", params: { returnTo: "/checkout" } });
+  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
+
   // When session lands, close the modal
   useEffect(() => {
-    if (session) router.replace("/(tabs)");
-  }, [session]);
+    if (!session) return;
+    if (returnTo && typeof returnTo === "string" && returnTo.startsWith("/")) {
+      router.replace(returnTo as any);
+    } else {
+      router.replace("/(tabs)");
+    }
+  }, [session, returnTo]);
 
   const handle = async (which: "google" | "apple" | "facebook") => {
     setBusy(which);

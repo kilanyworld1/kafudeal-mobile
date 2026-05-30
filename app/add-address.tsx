@@ -49,11 +49,11 @@ export default function AddAddress() {
         accuracy: Location.Accuracy.Balanced,
       });
 
-      // 3. Reverse-geocode to a readable address (uses iOS / Android built-in,
-      // no Google API key needed). On some Android devices the built-in
-      // geocoder throws "getCountryCode must not be null" — we treat that as
-      // "got the location but no address text" and let the user type the
-      // rest manually.
+      // 3. Try Expo's built-in reverse geocoder first (free, no network).
+      // It works fine in the US/EU but is unreliable in regions where
+      // Google Play Services data is sparse (Palestine, parts of MENA,
+      // Africa, etc.). If it fails we fall back to Nominatim, the free
+      // OpenStreetMap reverse-geocode service that covers everywhere.
       let place: any = null;
       try {
         const results = await Location.reverseGeocodeAsync({
@@ -62,19 +62,47 @@ export default function AddAddress() {
         });
         place = results?.[0] || null;
       } catch (geoErr) {
-        // Swallow — handled below
         place = null;
       }
 
-      if (!place) {
+      // 3b. Nominatim fallback — runs only when the OS geocoder gave us
+      // nothing usable. Free, no API key. We hit it directly from the
+      // device. Their TOS allows up to 1 req/sec; a user tapping this
+      // button is well under that.
+      if (!place || (!place.city && !place.street && !place.name)) {
+        try {
+          const resp = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${position.coords.latitude}&lon=${position.coords.longitude}&accept-language=en`,
+            {
+              headers: {
+                // Required by Nominatim TOS — identifies the app
+                "User-Agent": "KafuDeal/1.0 (kafudeal.com)",
+              },
+            }
+          );
+          if (resp.ok) {
+            const data = await resp.json();
+            const a = data?.address || {};
+            place = {
+              name: a.building || a.house_name || a.shop || null,
+              street: [a.house_number, a.road].filter(Boolean).join(" ") || null,
+              district: a.neighbourhood || a.suburb || a.quarter || a.city_district || null,
+              subregion: a.county || a.state_district || null,
+              city: a.city || a.town || a.village || a.municipality || null,
+            };
+          }
+        } catch {
+          // Network error — fall through to the "couldn't auto-fill" path
+        }
+      }
+
+      if (!place || (!place.city && !place.street && !place.name && !place.district)) {
         setLocating(false);
         Alert.alert(
           "Got your location",
           "We pinned your spot but couldn't auto-fill the address text. Please type it in below — your GPS location is saved.",
           [{ text: "OK" }]
         );
-        // Pre-fill city default at least
-        if (!city) setCity("Dubai");
         return;
       }
 
