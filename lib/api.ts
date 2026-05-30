@@ -411,7 +411,55 @@ export const cartAPI = {
  * ORDERS API (Requires Authentication)
  */
 export const ordersAPI = {
+  // ---------------------------------------------------------------
+  // createOrder — calls the server-side `place_order` RPC.
+  //
+  // The RPC recomputes totals from the cart on the server and splits
+  // the cart into one order per partner. The client cannot influence
+  // total, subtotal, payment_status, or order_status — earlier versions
+  // let any of those be tampered (e.g. set total=0, mark paid, etc.).
+  //
+  // Required:  delivery_address (text)
+  // Optional:  payment_method, notes
+  //
+  // Returns { data: { id }, error } so existing callers (which read
+  // `data.id` to navigate to /order/[id]) keep working unchanged.
+  // ---------------------------------------------------------------
   createOrder: async (orderData: Record<string, any> = {}) => {
+    try {
+      const delivery_address: string = orderData.delivery_address;
+      if (!delivery_address || delivery_address.trim().length < 5) {
+        return handleError({
+          message: "Please choose a delivery address before placing the order.",
+        });
+      }
+
+      const { data, error } = await supabase.rpc("place_order", {
+        p_delivery_address: delivery_address,
+        p_payment_method: orderData.payment_method || "Card",
+        p_notes: orderData.notes ?? null,
+      });
+
+      if (error) return handleError(error);
+
+      const primaryOrderId =
+        (data && (data as any).primary_order_id) ||
+        (data && (data as any).order_ids?.[0]);
+
+      if (!primaryOrderId) {
+        return handleError({ message: "Order created but no id returned." });
+      }
+
+      // Shape the response so existing callers keep working.
+      return { data: { id: primaryOrderId, ...(data as object) }, error: null };
+    } catch (error) {
+      return handleError(error);
+    }
+  },
+
+  // Legacy direct-insert createOrder — kept around for one release in case
+  // the RPC migration hasn't been applied yet. Will be removed in v12.
+  _createOrderLegacy: async (orderData: Record<string, any> = {}) => {
     try {
       // Strip undefined/null keys so we never send a column that's been disabled
       orderData = Object.fromEntries(
@@ -733,6 +781,58 @@ export const contentAPI = {
     }
   },
 };
+
+/**
+ * ADDRESSES — customer-managed delivery addresses (v11.6).
+ *
+ * RLS on `customer_addresses` should already restrict rows to the owning
+ * customer. We only need a `customer_id` join here because we don't ship
+ * the auth.user_id back into the table.
+ */
+export const addressesAPI = {
+  // Return the signed-in customer's saved addresses, default first.
+  list: async () => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return { data: [], error: null };
+
+      const { data: customer } = await supabase
+        .from("customers")
+        .select("id")
+        .eq("auth_user_id", user.id)
+        .maybeSingle();
+      if (!customer) return { data: [], error: null };
+
+      const { data, error } = await supabase
+        .from("customer_addresses")
+        .select("*")
+        .eq("customer_id", customer.id)
+        .order("is_default", { ascending: false })
+        .order("created_at", { ascending: false });
+
+      if (error) return handleError(error);
+      return { data: data || [], error: null };
+    } catch (error) {
+      return handleError(error);
+    }
+  },
+
+  // Format an address row into a one-line string the order can store.
+  // The customer_addresses table uses `address_line`, `city`, `emirate`,
+  // `phone` (UAE-style schema).
+  formatForOrder: (addr: any): string => {
+    if (!addr) return "";
+    const parts = [
+      addr.address_line,
+      [addr.city, addr.emirate].filter(Boolean).join(", "),
+      addr.phone,
+    ].filter((s) => s && String(s).trim().length > 0);
+    return parts.join(" · ");
+  },
+};
+
 
 /**
  * NOTIFICATIONS — mobile-side reads of rows written by DB triggers (v8).

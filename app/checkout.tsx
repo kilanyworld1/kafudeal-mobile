@@ -1,42 +1,70 @@
-import { useState } from "react";
-import { View, Text, ScrollView, Pressable, TextInput, StyleSheet, Image, ActivityIndicator, Alert } from "react-native";
+import { useEffect, useState } from "react";
+import { View, Text, ScrollView, Pressable, StyleSheet, Image, ActivityIndicator, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { useCart } from "../lib/cart-context";
 import { useAuth } from "../lib/auth-context";
-import { ordersAPI } from "../lib/api";
+import { ordersAPI, addressesAPI } from "../lib/api";
 
-const addresses = [
-  { id: "a1", label: "Home", line: "Marina Towers, Tower 3, Apt 1402", area: "Dubai Marina · JLT", default: true },
-  { id: "a2", label: "Work", line: "Boulevard Plaza, Office 22", area: "Downtown Dubai", default: false },
-];
-
+// Payment options. These are display-only for now — the real payment integration
+// (Stripe, Tap, etc.) is a v12 task. We just store the chosen label on the order
+// so the dashboard knows what the customer picked.
 const payments = [
   { id: "p1", label: "Visa ending in 4242", icon: "card-outline" as const },
   { id: "p2", label: "Cash on Delivery", icon: "cash-outline" as const },
   { id: "p3", label: "Apple Pay", icon: "logo-apple" as const },
 ];
 
+type Address = {
+  id: string;
+  label: string;
+  address_line: string;
+  city?: string | null;
+  emirate?: string | null;
+  phone?: string | null;
+  is_default?: boolean | null;
+};
+
 export default function Checkout() {
   const insets = useSafeAreaInsets();
   const { items, subtotal, clear, showToast } = useCart();
   const { customer } = useAuth();
-  const [addr, setAddr] = useState("a1");
+
+  const [addresses, setAddresses] = useState<Address[]>([]);
+  const [loadingAddresses, setLoadingAddresses] = useState(true);
+  const [addrId, setAddrId] = useState<string | null>(null);
   const [pay, setPay] = useState("p1");
-  const [voucher, setVoucher] = useState("");
-  const [vApplied, setVApplied] = useState(false);
   const [placing, setPlacing] = useState(false);
 
+  // Pull the customer's saved addresses on mount. If they haven't saved any
+  // we send them to /add-address — orders without a real address used to land
+  // in admin pointing at a hardcoded mock ("Marina Towers, Tower 3"), which
+  // obviously wouldn't work for real customers.
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      setLoadingAddresses(true);
+      const { data } = await addressesAPI.list();
+      if (!alive) return;
+      const list = (data || []) as Address[];
+      setAddresses(list);
+      // Auto-select the default address (or first if no default)
+      const def = list.find((a) => a.is_default) || list[0];
+      if (def) setAddrId(def.id);
+      setLoadingAddresses(false);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [customer?.id]);
+
   const delivery = subtotal >= 100 ? 0 : 15;
-  const discount = vApplied ? 5 : 0;
-  const total = Math.max(0, subtotal + delivery - discount);
+  const total = Math.max(0, subtotal + delivery);
 
   const placeOrder = async () => {
     if (items.length === 0) return;
 
-    // Require sign-in to place real orders. Otherwise the order can't be saved
-    // and shown in the admin / orders list (which is the whole point).
     if (!customer?.id) {
       Alert.alert(
         "Sign in to place an order",
@@ -49,18 +77,29 @@ export default function Checkout() {
       return;
     }
 
+    // The server-side RPC will refuse to create an order without a real
+    // delivery address — surface that to the user before we even call.
+    const selectedAddress = addresses.find((a) => a.id === addrId);
+    if (!selectedAddress) {
+      Alert.alert(
+        "Choose a delivery address",
+        "Add a delivery address so we know where to send your order.",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Add address", onPress: () => router.push("/add-address") },
+        ]
+      );
+      return;
+    }
+
     setPlacing(true);
-    // Only send fields that are real columns on `orders` in the current schema.
-    // voucher_code is not yet a column on the table → would crash the insert.
-    const orderData: Record<string, any> = {
+    const { data, error } = await ordersAPI.createOrder({
+      delivery_address: addressesAPI.formatForOrder(selectedAddress),
       payment_method: payments.find((p) => p.id === pay)?.label || "Card",
-    };
-    const { data, error } = await ordersAPI.createOrder(orderData);
+    });
     setPlacing(false);
 
     if (error || !data) {
-      // `error` from the web-style API is already a string (from handleError).
-      // Older callers might pass an Error object — handle both.
       const msg =
         typeof error === "string"
           ? error
@@ -70,7 +109,6 @@ export default function Checkout() {
       return;
     }
 
-    // Success! Clear cart, show a toast, then go to tracking with the real DB id.
     clear();
     showToast({ message: "Order confirmed!", kind: "cart" });
     router.replace(`/order/${data.id}`);
@@ -94,38 +132,61 @@ export default function Checkout() {
             <Text style={s.sectionLink}>Manage</Text>
           </Pressable>
         </View>
-        {addresses.map((a) => {
-          const active = addr === a.id;
-          return (
-            <Pressable
-              key={a.id}
-              onPress={() => setAddr(a.id)}
-              style={[s.card, active && s.cardActive]}
-            >
-              <View style={s.cardRow}>
-                <View style={[s.radio, active && s.radioActive]}>
-                  {active && <View style={s.radioDot} />}
-                </View>
-                <View style={{ flex: 1 }}>
-                  <View style={s.labelRow}>
-                    <Text style={s.cardLabel}>{a.label}</Text>
-                    {a.default && (
-                      <View style={s.defaultPill}>
-                        <Text style={s.defaultPillText}>DEFAULT</Text>
-                      </View>
-                    )}
+
+        {loadingAddresses ? (
+          <View style={s.card}>
+            <ActivityIndicator color="#FF6B2C" />
+          </View>
+        ) : addresses.length === 0 ? (
+          <Pressable onPress={() => router.push("/add-address")} style={s.emptyCard}>
+            <Ionicons name="location-outline" size={22} color="#FF6B2C" />
+            <View style={{ flex: 1 }}>
+              <Text style={s.emptyTitle}>No saved addresses yet</Text>
+              <Text style={s.emptySub}>Add an address so we can deliver your order.</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#FF6B2C" />
+          </Pressable>
+        ) : (
+          addresses.map((a) => {
+            const active = addrId === a.id;
+            return (
+              <Pressable
+                key={a.id}
+                onPress={() => setAddrId(a.id)}
+                style={[s.card, active && s.cardActive]}
+              >
+                <View style={s.cardRow}>
+                  <View style={[s.radio, active && s.radioActive]}>
+                    {active && <View style={s.radioDot} />}
                   </View>
-                  <Text style={s.cardLine}>{a.line}</Text>
-                  <Text style={s.cardArea}>{a.area}</Text>
+                  <View style={{ flex: 1 }}>
+                    <View style={s.labelRow}>
+                      <Text style={s.cardLabel}>{a.label}</Text>
+                      {a.is_default && (
+                        <View style={s.defaultPill}>
+                          <Text style={s.defaultPillText}>DEFAULT</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={s.cardLine}>{a.address_line}</Text>
+                    {(a.city || a.emirate) ? (
+                      <Text style={s.cardArea}>
+                        {[a.city, a.emirate].filter(Boolean).join(", ")}
+                      </Text>
+                    ) : null}
+                  </View>
                 </View>
-              </View>
-            </Pressable>
-          );
-        })}
-        <Pressable onPress={() => router.push("/add-address")} style={s.addAddrBtn}>
-          <Ionicons name="add-circle-outline" size={18} color="#FF6B2C" />
-          <Text style={s.addAddrText}>Add new address</Text>
-        </Pressable>
+              </Pressable>
+            );
+          })
+        )}
+
+        {addresses.length > 0 && (
+          <Pressable onPress={() => router.push("/add-address")} style={s.addAddrBtn}>
+            <Ionicons name="add-circle-outline" size={18} color="#FF6B2C" />
+            <Text style={s.addAddrText}>Add new address</Text>
+          </Pressable>
+        )}
 
         {/* Delivery slot */}
         <Text style={[s.sectionTitle, { marginTop: 24 }]}>Delivery slot</Text>
@@ -163,30 +224,10 @@ export default function Checkout() {
           );
         })}
 
-        {/* Voucher */}
-        <Text style={[s.sectionTitle, { marginTop: 24 }]}>Voucher</Text>
-        <View style={s.voucherRow}>
-          <TextInput
-            value={voucher}
-            onChangeText={(t) => { setVoucher(t); setVApplied(false); }}
-            placeholder="Enter code"
-            placeholderTextColor="#94A3B8"
-            style={s.voucherInput}
-            autoCapitalize="characters"
-          />
-          <Pressable
-            onPress={() => voucher.length >= 3 && setVApplied(true)}
-            style={[s.voucherBtn, vApplied && { backgroundColor: "#16A34A" }]}
-          >
-            <Text style={s.voucherBtnText}>{vApplied ? "Applied" : "Apply"}</Text>
-          </Pressable>
-        </View>
-        {vApplied && (
-          <View style={s.voucherOk}>
-            <Ionicons name="checkmark-circle" size={16} color="#16A34A" />
-            <Text style={s.voucherOkText}>5 AED off applied</Text>
-          </View>
-        )}
+        {/* Voucher removed in v11.6 — it was cosmetic only, didn't save to DB,
+            and could mislead customers into expecting a discount they didn't
+            actually get. We'll bring it back when vouchers are a real table
+            with server-side validation. */}
 
         {/* Order summary */}
         <Text style={[s.sectionTitle, { marginTop: 24 }]}>Order summary</Text>
@@ -214,12 +255,6 @@ export default function Checkout() {
             <Text style={s.sumLbl}>Delivery</Text>
             <Text style={s.sumVal}>AED {delivery.toFixed(2)}</Text>
           </View>
-          {vApplied && (
-            <View style={s.sumRow}>
-              <Text style={s.sumLbl}>Voucher</Text>
-              <Text style={[s.sumVal, { color: "#16A34A" }]}>− AED {discount.toFixed(2)}</Text>
-            </View>
-          )}
           <View style={s.divider} />
           <View style={s.sumRow}>
             <Text style={s.totalLbl}>Total</Text>
@@ -229,7 +264,11 @@ export default function Checkout() {
       </ScrollView>
 
       <View style={[s.bottomBar, { paddingBottom: insets.bottom + 12 }]}>
-        <Pressable onPress={placeOrder} style={[s.placeBtn, (items.length === 0 || placing) && { opacity: 0.6 }]} disabled={items.length === 0 || placing}>
+        <Pressable
+          onPress={placeOrder}
+          style={[s.placeBtn, (items.length === 0 || placing) && { opacity: 0.6 }]}
+          disabled={items.length === 0 || placing}
+        >
           {placing ? (
             <ActivityIndicator color="white" />
           ) : (
@@ -263,6 +302,14 @@ const s = StyleSheet.create({
   },
   cardActive: { borderColor: "#FF6B2C", backgroundColor: "#FFF4EC" },
   cardRow: { flexDirection: "row", alignItems: "center" },
+  emptyCard: {
+    flexDirection: "row", alignItems: "center", gap: 12,
+    backgroundColor: "white", borderRadius: 14, padding: 14,
+    marginBottom: 10,
+    borderWidth: 1, borderStyle: "dashed", borderColor: "rgba(255,107,44,0.30)",
+  },
+  emptyTitle: { fontSize: 14, fontWeight: "800", color: "#0F172A" },
+  emptySub: { fontSize: 12, color: "#64748B", marginTop: 2 },
   radio: {
     width: 22, height: 22, borderRadius: 11,
     borderWidth: 2, borderColor: "#CBD5E1",
@@ -294,20 +341,6 @@ const s = StyleSheet.create({
   slotSub: { fontSize: 11.5, color: "#64748B", marginTop: 2 },
   slotPrice: { fontSize: 14, fontWeight: "800", color: "#FF6B2C" },
   payLabel: { fontSize: 14, fontWeight: "700", color: "#0F172A" },
-  voucherRow: { flexDirection: "row", gap: 8 },
-  voucherInput: {
-    flex: 1, backgroundColor: "white", borderRadius: 12,
-    paddingHorizontal: 14, paddingVertical: 12,
-    fontSize: 14, color: "#0F172A", letterSpacing: 1,
-    borderWidth: 1, borderColor: "rgba(15,23,42,0.10)",
-  },
-  voucherBtn: {
-    backgroundColor: "#0F172A", borderRadius: 12,
-    paddingHorizontal: 18, alignItems: "center", justifyContent: "center",
-  },
-  voucherBtnText: { color: "white", fontSize: 13, fontWeight: "800" },
-  voucherOk: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8 },
-  voucherOkText: { color: "#166534", fontSize: 12, fontWeight: "700" },
   itemRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 8 },
   itemImg: { width: 40, height: 40, borderRadius: 8 },
   itemName: { fontSize: 13, fontWeight: "700", color: "#0F172A" },
