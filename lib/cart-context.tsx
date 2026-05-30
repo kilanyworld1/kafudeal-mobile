@@ -41,6 +41,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const badgeScale = useRef(new Animated.Value(1)).current;
   const toastId = useRef(0);
   const prevUserRef = useRef<string | null>(null);
+  // Ref-tracked items + customer-id so the cart-migration effect can read
+  // the latest guest cart at sign-in time without putting `items` in its
+  // dependency array (which would cause an infinite loop).
+  const itemsRef = useRef<LocalCartItem[]>([]);
+  const prevCustomerIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
 
   const bump = () => {
     Animated.sequence([
@@ -91,13 +99,39 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [customer?.id]);
 
   useEffect(() => {
-    if (!customer?.id) {
+    const currentId = customer?.id || null;
+    const prevId = prevCustomerIdRef.current;
+    prevCustomerIdRef.current = currentId;
+
+    if (!currentId) {
+      // Signed out → clear out signed-in data. Guest cart is rebuilt on
+      // the next mount if/when this provider remounts.
       setItems([]);
       setSaved([]);
       return;
     }
+
+    // Detect "guest just signed in": prev was null, current is a real id.
+    // Snapshot the guest cart RIGHT NOW (before refreshCart wipes it) so
+    // we can migrate those rows into the customer's server cart.
+    const isSignInTransition = !prevId && currentId;
+    const guestItems = isSignInTransition ? [...itemsRef.current] : [];
+
     let cancelled = false;
     (async () => {
+      // Migrate guest cart to server BEFORE pulling the server cart down.
+      // Each addToCart upserts on (customer_id, product_id) so quantities
+      // are summed correctly if the customer already had this product saved.
+      if (guestItems.length > 0) {
+        for (const item of guestItems) {
+          try {
+            await cartAPI.addToCart(item.product.id, item.qty);
+          } catch (e) {
+            console.warn("Cart migration failed for", item.product.id, e);
+          }
+        }
+      }
+
       await refreshCart();
       const { data: savedIds } = await savedAPI.getSaved();
       if (!cancelled) setSaved(savedIds);
