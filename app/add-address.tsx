@@ -50,20 +50,31 @@ export default function AddAddress() {
       });
 
       // 3. Reverse-geocode to a readable address (uses iOS / Android built-in,
-      // no Google API key needed)
-      const results = await Location.reverseGeocodeAsync({
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-      });
+      // no Google API key needed). On some Android devices the built-in
+      // geocoder throws "getCountryCode must not be null" — we treat that as
+      // "got the location but no address text" and let the user type the
+      // rest manually.
+      let place: any = null;
+      try {
+        const results = await Location.reverseGeocodeAsync({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        });
+        place = results?.[0] || null;
+      } catch (geoErr) {
+        // Swallow — handled below
+        place = null;
+      }
 
-      const place = results?.[0];
       if (!place) {
         setLocating(false);
         Alert.alert(
-          "Couldn't read your address",
-          "We got your location but couldn't turn it into a street address. Please type it in.",
+          "Got your location",
+          "We pinned your spot but couldn't auto-fill the address text. Please type it in below — your GPS location is saved.",
           [{ text: "OK" }]
         );
+        // Pre-fill city default at least
+        if (!city) setCity("Dubai");
         return;
       }
 
