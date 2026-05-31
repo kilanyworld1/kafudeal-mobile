@@ -19,6 +19,10 @@ type AuthContextValue = {
   signInWithApple: () => Promise<void>;
   signInWithFacebook: () => Promise<void>;
   signOut: () => Promise<void>;
+  // Force a re-fetch of the customer profile. Useful when a screen
+  // discovers the customer is null but the user is clearly signed in —
+  // e.g. checkout pressing "place order" and finding no customer.id yet.
+  refreshProfile: () => Promise<Customer | null>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -43,9 +47,67 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Trust the server-side trigger (handle_new_user) to create the customers row.
-  // We just READ the profile. If the trigger hasn't run yet for a brand-new
-  // signup, retry a couple of times.
+  // refreshProfile — try to read the customer row, and if the server-side
+  // trigger (handle_new_user) never created one, create it ourselves from
+  // the auth session metadata. This is the self-healing path: even if the
+  // trigger is missing or broken, the app recovers.
+  //
+  // RLS allows this insert because customers_own_profile_only permits
+  // inserts where auth_user_id = auth.uid().
+  const refreshProfile = useCallback(async (): Promise<Customer | null> => {
+    const u = session?.user;
+    if (!u) {
+      setCustomer(null);
+      return null;
+    }
+
+    // 1. Try a few times to read an existing row (covers the trigger-just-fired race)
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const { data } = await authAPI.getProfile();
+      if (data) {
+        const c = transformCustomer(data);
+        setCustomer(c);
+        identifyCrispUser(c);
+        return c;
+      }
+      await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+    }
+
+    // 2. Still nothing — the trigger didn't fire for this user. Create the
+    // row from the client. RLS lets us insert as long as auth_user_id is
+    // our own auth.uid().
+    try {
+      const fallbackName =
+        (u.user_metadata?.full_name as string) ||
+        (u.user_metadata?.name as string) ||
+        (u.user_metadata?.preferred_username as string) ||
+        (u.email ? u.email.split("@")[0] : "Customer");
+
+      const { data: created, error } = await supabase
+        .from("customers")
+        .insert({
+          auth_user_id: u.id,
+          email: u.email,
+          name: fallbackName,
+        })
+        .select()
+        .single();
+
+      if (error || !created) {
+        console.warn("Self-heal customer insert failed:", error);
+        return null;
+      }
+      const c = transformCustomer(created);
+      setCustomer(c);
+      identifyCrispUser(c);
+      return c;
+    } catch (e) {
+      console.warn("Self-heal customer insert threw:", e);
+      return null;
+    }
+  }, [session?.user?.id]);
+
+  // On every auth-state change, run a fresh profile fetch / create.
   useEffect(() => {
     if (!session?.user) {
       setCustomer(null);
@@ -55,24 +117,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     let cancelled = false;
     (async () => {
-      for (let attempt = 0; attempt < 4; attempt++) {
-        const { data } = await authAPI.getProfile();
-        if (cancelled) return;
-        if (data) {
-          const c = transformCustomer(data);
-          setCustomer(c);
-          // Attach the signed-in customer to Crisp so support sees their name/email.
-          identifyCrispUser(c);
-          return;
-        }
-        // wait a bit for the trigger to fire on first signup
-        await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
-      }
+      if (cancelled) return;
+      await refreshProfile();
     })();
     return () => {
       cancelled = true;
     };
-  }, [session?.user?.id]);
+  }, [session?.user?.id, refreshProfile]);
 
   const signInWithProvider = useCallback(async (provider: "google" | "apple" | "facebook") => {
     try {
@@ -174,6 +225,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signInWithApple,
         signInWithFacebook,
         signOut,
+        refreshProfile,
       }}
     >
       {children}

@@ -29,7 +29,7 @@ type Address = {
 export default function Checkout() {
   const insets = useSafeAreaInsets();
   const { items, subtotal, clear, showToast } = useCart();
-  const { customer } = useAuth();
+  const { customer, session, refreshProfile } = useAuth();
 
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [loadingAddresses, setLoadingAddresses] = useState(true);
@@ -72,15 +72,26 @@ export default function Checkout() {
     if (items.length === 0) return;
 
     if (!customer?.id) {
+      // First, if the user IS signed in but their profile hasn't loaded
+      // (this happens when the DB trigger didn't fire for this account),
+      // try to refresh/create the profile before giving up on the user.
+      if (session?.user) {
+        const fresh = await refreshProfile();
+        if (fresh?.id) {
+          // Self-heal worked — fall through and place the order with `fresh`.
+          // Re-enter placeOrder so the rest runs with the freshly loaded
+          // customer. (The next render will have customer set, so a single
+          // re-tap also works, but this is smoother UX.)
+          return placeOrder();
+        }
+      }
+
       Alert.alert(
         "Sign in to place an order",
         "We'll save your cart and let you track the order. It only takes a few seconds.",
         [
           { text: "Cancel", style: "cancel" },
           {
-            // router.push opens the login modal on top of this screen.
-            // When the user signs in, login.tsx calls router.back() which
-            // dismisses the modal and drops us right back here.
             text: "Sign in",
             onPress: () => router.push("/login"),
           },
