@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "5251062212",
+    "project_id": "kafudeal-auth",
+    "storage_bucket": "kafudeal-auth.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:5251062212:android:d0cc6693b08e9cfd4d2c91",
+        "android_client_info": {
+          "package_name": "com.kafudeal.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "5251062212-1a29597dssqvrcoosp3c69iil4i7f7lk.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA3YbYFVsOUZPLolhahlYq2fy4mJnpP3WQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "5251062212-1a29597dssqvrcoosp3c69iil4i7f7lk.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

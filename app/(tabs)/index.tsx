@@ -15,6 +15,7 @@ import { useNotifications } from "../../lib/notifications-context";
 import { categories as STATIC_CATS } from "../../data/products";
 import ProductCard from "../../components/ProductCard";
 import HeaderIconButton from "../../components/HeaderIconButton";
+import NotificationPrePrompt from "../../components/NotificationPrePrompt";
 
 const PHRASES = [
   "Try 'chocolate'",
@@ -468,6 +469,12 @@ export default function Home() {
           </>
         )}
       </Animated.ScrollView>
+
+      {/* Friendly pre-prompt for notification permission. Shows ~5s after
+          the user signs in & lands on home, and only if we've never asked.
+          The modal itself decides whether to render based on the user's
+          current permission status, so it's safe to leave mounted here. */}
+      <NotificationPrePrompt delayMs={5000} />
     </View>
   );
 }

@@ -9,6 +9,7 @@ import { authAPI } from "./api";
 import { transformCustomer } from "./transformers";
 import type { Customer } from "./types";
 import { identifyCrispUser, resetCrispSession } from "./crisp";
+import { registerDeviceForCustomer, unregisterDevice, getPermissionStatus } from "./push";
 
 type AuthContextValue = {
   session: Session | null;
@@ -125,6 +126,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [session?.user?.id, refreshProfile]);
 
+  // When the customer row is ready AND notification permission has already
+  // been granted (because the user said yes in a previous session), upsert
+  // the push token to customer_devices so the server can reach this phone.
+  // We do NOT prompt here — that's the home screen's job, contextually.
+  useEffect(() => {
+    if (!customer?.id) return;
+    let cancelled = false;
+    (async () => {
+      const status = await getPermissionStatus();
+      if (cancelled) return;
+      if (status === "granted") {
+        await registerDeviceForCustomer(customer.id);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [customer?.id]);
+
   const signInWithProvider = useCallback(async (provider: "google" | "apple" | "facebook") => {
     try {
       const redirectTo = Linking.createURL("auth-callback");
@@ -211,6 +231,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
+    // Drop this device's push token so the next user signing in on this
+    // phone doesn't receive notifications meant for the previous account.
+    try {
+      await unregisterDevice();
+    } catch (e) {
+      console.warn("unregisterDevice on sign out failed:", e);
+    }
     await supabase.auth.signOut();
   }, []);
 

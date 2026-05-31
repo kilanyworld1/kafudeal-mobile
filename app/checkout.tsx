@@ -6,6 +6,7 @@ import { router, useFocusEffect } from "expo-router";
 import { useCart } from "../lib/cart-context";
 import { useAuth } from "../lib/auth-context";
 import { ordersAPI, addressesAPI } from "../lib/api";
+import { getPermissionStatus, hasBeenAsked, requestPermission, registerDeviceForCustomer } from "../lib/push";
 
 // Payment options. These are display-only for now — the real payment integration
 // (Stripe, Tap, etc.) is a v12 task. We just store the chosen label on the order
@@ -134,6 +135,36 @@ export default function Checkout() {
 
     clear();
     showToast({ message: "Order confirmed!", kind: "cart" });
+
+    // Second-chance notification prompt: only if the user previously
+    // declined or hasn't been asked yet AND status is still undetermined.
+    // The order they just placed is the perfect moment — they have a
+    // real reason to want updates now.
+    try {
+      const status = await getPermissionStatus();
+      if (status === "undetermined") {
+        Alert.alert(
+          "Get order updates?",
+          "Want a notification when your order is on the way and when it arrives?",
+          [
+            { text: "Not now", style: "cancel" },
+            {
+              text: "Yes, notify me",
+              onPress: async () => {
+                const next = await requestPermission();
+                if (next === "granted" && customer?.id) {
+                  await registerDeviceForCustomer(customer.id);
+                }
+              },
+            },
+          ]
+        );
+      }
+    } catch (e) {
+      // Don't block navigation on a prompt error — just log
+      console.warn("Post-order notif prompt failed:", e);
+    }
+
     router.replace(`/order/${data.id}`);
   };
 

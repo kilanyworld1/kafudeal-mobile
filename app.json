@@ -2,7 +2,7 @@
   "expo": {
     "name": "KafuDeal",
     "slug": "kafudeal",
-    "version": "0.11.15",
+    "version": "0.12.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "kafudeal",
@@ -26,7 +26,8 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FF6B2C"
       },
-      "package": "com.kafudeal.app"
+      "package": "com.kafudeal.app",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "bundler": "metro",
@@ -39,6 +40,14 @@
         "expo-location",
         {
           "locationAlwaysAndWhenInUsePermission": "Allow KafuDeal to use your location to set your delivery address."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#FF6B2C",
+          "defaultChannel": "default"
         }
       ]
     ],

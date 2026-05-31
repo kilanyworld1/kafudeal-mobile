@@ -1,9 +1,10 @@
 import { useEffect } from "react";
-import { Stack } from "expo-router";
+import { Stack, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
+import * as Notifications from "expo-notifications";
 import { AuthProvider } from "../lib/auth-context";
 import { CartProvider } from "../lib/cart-context";
 import { NotificationsProvider } from "../lib/notifications-context";
@@ -32,6 +33,30 @@ export default function RootLayout() {
   // Initialise Crisp once when the app boots.
   useEffect(() => {
     initCrisp();
+  }, []);
+
+  // Notification tap → deep link. The push payload should include a
+  // `route` field (e.g. "/order/abc-123" or "/product/xyz"). The Edge
+  // Function that sends pushes is responsible for setting it.
+  useEffect(() => {
+    // 1. App was killed and opened by tapping a notification
+    (async () => {
+      const initial = await Notifications.getLastNotificationResponseAsync();
+      const route = initial?.notification?.request?.content?.data?.route;
+      if (typeof route === "string" && route.startsWith("/")) {
+        // Defer so the navigator is mounted before we navigate.
+        setTimeout(() => router.push(route as any), 200);
+      }
+    })();
+
+    // 2. App was foreground/background and the user tapped a push
+    const sub = Notifications.addNotificationResponseReceivedListener((res) => {
+      const route = res?.notification?.request?.content?.data?.route;
+      if (typeof route === "string" && route.startsWith("/")) {
+        router.push(route as any);
+      }
+    });
+    return () => sub.remove();
   }, []);
 
   // Hide the splash only once we're actually ready to render UI. This
