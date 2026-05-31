@@ -7,7 +7,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useFocusEffect } from "expo-router";
-import { productsAPI, categoriesAPI } from "../../lib/api";
+import { productsAPI, categoriesAPI, addressesAPI } from "../../lib/api";
 import { transformProduct, transformCategory } from "../../lib/transformers";
 import type { Product, Category } from "../../lib/types";
 import { useAuth } from "../../lib/auth-context";
@@ -35,6 +35,49 @@ export default function Home() {
   const [liveCategories, setLiveCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCat, setSelectedCat] = useState<string>(ALL);
+  // Default / first saved address label to show in the "DELIVER TO" pill.
+  // Falls back to a sensible placeholder if the customer has none yet.
+  const [deliverToLabel, setDeliverToLabel] = useState<string>("Dubai Marina · JLT");
+
+  // Refresh the deliver-to label every time the home screen is focused —
+  // covers the user adding / setting a default address elsewhere.
+  useFocusEffect(
+    useCallback(() => {
+      let alive = true;
+      (async () => {
+        if (!customer?.id) {
+          if (alive) setDeliverToLabel("Dubai Marina · JLT");
+          return;
+        }
+        const { data } = await addressesAPI.list();
+        if (!alive) return;
+        const list = (data || []) as any[];
+        if (list.length === 0) {
+          setDeliverToLabel("Dubai Marina · JLT");
+          return;
+        }
+        // Pick default if any, else most recent (already sorted that way by list())
+        const chosen = list.find((a) => a.is_default) || list[0];
+        // Show city · emirate when available, otherwise label · address_line tail
+        const cityEmirate = [chosen.city, chosen.emirate].filter(Boolean).join(", ");
+        if (cityEmirate) {
+          setDeliverToLabel(cityEmirate);
+        } else if (chosen.address_line) {
+          // Trim long address_line so it doesn't overflow the banner
+          const short =
+            chosen.address_line.length > 30
+              ? chosen.address_line.slice(0, 27) + "…"
+              : chosen.address_line;
+          setDeliverToLabel(`${chosen.label || "Home"} · ${short}`);
+        } else {
+          setDeliverToLabel(chosen.label || "Home");
+        }
+      })();
+      return () => {
+        alive = false;
+      };
+    }, [customer?.id])
+  );
 
   // Sticky header animation
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -174,7 +217,7 @@ export default function Home() {
         <View style={s.stickyTopRow}>
           <Pressable onPress={() => router.push("/addresses")} style={s.stickyLoc} hitSlop={8}>
             <Ionicons name="location-sharp" size={14} color="#FF6B2C" />
-            <Text style={s.stickyLocText}>Dubai Marina · JLT</Text>
+            <Text style={s.stickyLocText} numberOfLines={1}>{deliverToLabel}</Text>
           </Pressable>
           <View style={{ flexDirection: "row", gap: 8 }}>
             <HeaderIconButton
@@ -248,7 +291,7 @@ export default function Home() {
               <Text style={s.eyebrow}>DELIVER TO</Text>
               <View style={s.locationRow}>
                 <Ionicons name="location-sharp" size={14} color="white" />
-                <Text style={s.locationText}>Dubai Marina · JLT</Text>
+                <Text style={s.locationText} numberOfLines={1}>{deliverToLabel}</Text>
                 <Ionicons name="chevron-down" size={14} color="white" style={{ marginLeft: 4, opacity: 0.7 }} />
               </View>
             </Pressable>

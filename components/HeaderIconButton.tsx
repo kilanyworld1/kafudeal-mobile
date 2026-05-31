@@ -53,10 +53,10 @@ export default function HeaderIconButton({
         onPress={onPress}
         onPressIn={pressIn}
         onPressOut={pressOut}
-        // Small symmetric hitSlop — the visible button is already 44px which is
-        // a comfortable tap target. Bigger hitSlop was stealing taps from the
-        // category chips below the banner on smaller phones.
-        hitSlop={6}
+        // Asymmetric hitSlop — generous UP / LEFT / RIGHT so it's easy to hit
+        // when scrolling, but minimal BOTTOM so we don't steal taps from the
+        // category chips directly below the banner.
+        hitSlop={{ top: 16, left: 14, right: 14, bottom: 4 }}
         android_ripple={{ color: "rgba(255,255,255,0.15)", borderless: true, radius: size }}
       >
         <Animated.View

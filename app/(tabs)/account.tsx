@@ -1,9 +1,11 @@
+import { useCallback, useState } from "react";
 import { View, Text, ScrollView, Pressable, Image, StyleSheet, Linking } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { useAuth } from "../../lib/auth-context";
 import { useCart } from "../../lib/cart-context";
+import { addressesAPI } from "../../lib/api";
 
 type MenuItem = {
   icon: string;
@@ -18,6 +20,26 @@ export default function Account() {
   const insets = useSafeAreaInsets();
   const { user, customer, signOut } = useAuth();
   const { saved } = useCart();
+  const [addressCount, setAddressCount] = useState<number>(0);
+
+  // Keep the address count fresh — re-fetch every time the Account tab is
+  // focused so adding/deleting an address elsewhere reflects here too.
+  useFocusEffect(
+    useCallback(() => {
+      let alive = true;
+      (async () => {
+        if (!customer?.id) {
+          if (alive) setAddressCount(0);
+          return;
+        }
+        const { data } = await addressesAPI.list();
+        if (alive) setAddressCount((data || []).length);
+      })();
+      return () => {
+        alive = false;
+      };
+    }, [customer?.id])
+  );
 
   const isLoggedIn = !!user;
   const displayName =
@@ -40,7 +62,9 @@ export default function Account() {
     { icon: "ticket", iconBg: "#DBEAFE", iconColor: "#1D4ED8",
       label: "Vouchers", sub: "2 active", route: "/vouchers" },
     { icon: "location", iconBg: "#ECFDF5", iconColor: "#15803D",
-      label: "Saved addresses", sub: "2 saved", route: "/addresses" },
+      label: "Saved addresses",
+      sub: `${addressCount} ${addressCount === 1 ? "saved" : "saved"}`,
+      route: "/addresses" },
   ];
 
   const SECONDARY_MENU: MenuItem[] = [

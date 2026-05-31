@@ -5,11 +5,26 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import * as Location from "expo-location";
 import { addressesAPI } from "../lib/api";
+import { useCart } from "../lib/cart-context";
+
+// Promise.race against a timer — if the wrapped promise hasn't resolved
+// within `ms` milliseconds, reject with a timeout error. Keeps the
+// "Use current location" button from spinning forever when GPS hangs.
+function withTimeout<T>(promise: Promise<T>, ms: number, label = "operation"): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(`${label} timed out`)), ms);
+    promise.then(
+      (v) => { clearTimeout(t); resolve(v); },
+      (e) => { clearTimeout(t); reject(e); }
+    );
+  });
+}
 
 const labels = ["Home", "Work", "Other"];
 
 export default function AddAddress() {
   const insets = useSafeAreaInsets();
+  const { showToast } = useCart();
   const [label, setLabel] = useState("Home");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -44,10 +59,15 @@ export default function AddAddress() {
       }
 
       // 2. Get current position. `Balanced` is faster + uses less battery
-      // than `High`. Plenty accurate for an address.
-      const position = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
+      // than `High`. Plenty accurate for an address. We wrap it in a
+      // 12-second timeout so the spinner can't hang forever on flaky GPS.
+      const position = await withTimeout(
+        Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        }),
+        12000,
+        "GPS"
+      );
 
       // 3. Try Expo's built-in reverse geocoder first (free, no network).
       // It works fine in the US/EU but is unreliable in regions where
@@ -56,10 +76,14 @@ export default function AddAddress() {
       // OpenStreetMap reverse-geocode service that covers everywhere.
       let place: any = null;
       try {
-        const results = await Location.reverseGeocodeAsync({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        });
+        const results = await withTimeout(
+          Location.reverseGeocodeAsync({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          }),
+          3000,
+          "OS geocoder"
+        );
         place = results?.[0] || null;
       } catch (geoErr) {
         place = null;
@@ -68,17 +92,22 @@ export default function AddAddress() {
       // 3b. Nominatim fallback — runs only when the OS geocoder gave us
       // nothing usable. Free, no API key. We hit it directly from the
       // device. Their TOS allows up to 1 req/sec; a user tapping this
-      // button is well under that.
+      // button is well under that. 8-second timeout so a slow network
+      // doesn't hang the spinner.
       if (!place || (!place.city && !place.street && !place.name)) {
         try {
-          const resp = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${position.coords.latitude}&lon=${position.coords.longitude}&accept-language=en`,
-            {
-              headers: {
-                // Required by Nominatim TOS — identifies the app
-                "User-Agent": "KafuDeal/1.0 (kafudeal.com)",
-              },
-            }
+          const resp = await withTimeout(
+            fetch(
+              `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${position.coords.latitude}&lon=${position.coords.longitude}&accept-language=en`,
+              {
+                headers: {
+                  // Required by Nominatim TOS — identifies the app
+                  "User-Agent": "KafuDeal/1.0 (kafudeal.com)",
+                },
+              }
+            ),
+            8000,
+            "Nominatim"
           );
           if (resp.ok) {
             const data = await resp.json();
@@ -91,8 +120,9 @@ export default function AddAddress() {
               city: a.city || a.town || a.village || a.municipality || null,
             };
           }
-        } catch {
-          // Network error — fall through to the "couldn't auto-fill" path
+        } catch (nomErr) {
+          // Network error / timeout — fall through to the "couldn't auto-fill" path
+          console.warn("Nominatim geocode failed:", nomErr);
         }
       }
 
@@ -120,12 +150,15 @@ export default function AddAddress() {
       if (place.city) setCity(place.city);
 
       setLocating(false);
+      // Confirm success with a toast so the user knows the form was filled.
+      showToast({ message: "Location set — review and save", kind: "save" });
     } catch (err: any) {
       setLocating(false);
-      Alert.alert(
-        "Location error",
-        err?.message || "Couldn't get your location. Please type the address in."
-      );
+      // Friendlier message for the common timeout case.
+      const msg = (err?.message || "").toLowerCase().includes("timed out")
+        ? "Couldn't get your location — your GPS is slow or off. Please type the address in."
+        : err?.message || "Couldn't get your location. Please type the address in.";
+      Alert.alert("Location error", msg);
     }
   };
 
@@ -152,6 +185,9 @@ export default function AddAddress() {
       return;
     }
 
+    // Match the UX of saving a product to favourites — a toast confirms
+    // the action without making the user wait on a modal Alert.
+    showToast({ message: "Address saved", kind: "save" });
     router.back();
   };
 
