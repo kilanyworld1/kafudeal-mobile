@@ -1,28 +1,47 @@
 // Supabase Edge Function: send-broadcast-push
 //
-// Admin-initiated broadcasts. Called manually (curl / Postman / Dashboard
-// invoke / eventually a web admin UI). Lets an admin send a custom push
-// notification to "all" customers or to a specific list of customer_ids.
+// v12.3 — Admin-only push broadcasts, called from the admin Notifications
+// page in the web app. Supports three recipient modes:
+//   - "all"     → every customer
+//   - "filter"  → filter by city / order history / app activity
+//   - "ids"     → explicit list of customer_ids
+//
+// Auth model:
+//   The caller MUST be signed in as an admin (auth.users → admin_users).
+//   We verify by extracting their JWT, calling supabase.auth.getUser(jwt),
+//   then checking admin_users for that user_id. No more "anyone with the
+//   anon key can spam customers."
 //
 // Request body:
 //   {
 //     "title": "Flash sale 🔥",
-//     "body":  "20% off everything in Bakery — today only.",
-//     "route": "/product/abc-123",          // optional deep link
-//     "recipients": "all" | ["uuid1","uuid2",...]
+//     "body":  "20% off everything",
+//     "route": "/(tabs)/deals",          // optional deep link
+//     "filter": { "mode": "all" }        // see filter shape below
+//     // legacy: "recipients": "all" | ["uuid",...] still works
 //   }
 //
-// Authentication: requires the SERVICE_ROLE_KEY in the Authorization
-// header (Bearer <key>). This makes it admin-only — never expose this
-// function with the anon key.
+// Filter shape (matches resolve_broadcast_recipients RPC):
+//   {
+//     "mode": "all" | "filter" | "ids",
+//     "ids":  ["uuid",...],
+//     "cities": ["Ramallah","Dubai"],
+//     "ordered_within_days": 7,
+//     "never_ordered": true,
+//     "min_orders": 5,
+//     "active_within_days": 30,
+//     "inactive_for_days": 30
+//   }
 //
 // Response:
 //   {
-//     "sent":            number,     // tokens we successfully POSTed
-//     "skipped_disabled": number,    // customers with notifications_enabled=false
-//     "skipped_no_token": number,    // customers with zero registered devices
-//     "in_app_inserted": number,     // rows added to customer_notifications
-//     "expo_tickets":    [...]       // raw Expo Push API response
+//     "broadcast_id":     "uuid",
+//     "recipient_count":  number,   // customers the filter resolved to
+//     "sent":             number,   // tokens we POSTed to Expo
+//     "skipped_disabled": number,
+//     "skipped_no_token": number,
+//     "in_app_inserted":  number,
+//     "expo_tickets":     [...]
 //   }
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -47,82 +66,102 @@ serve(async (req) => {
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
 
   try {
-    // ----- 1. Auth.
-    // Two ways to authorise:
-    //   (a) Set ADMIN_BROADCAST_KEY as an Edge Function secret. The caller
-    //       passes that exact value as `Authorization: Bearer <key>`. This
-    //       is the recommended production path.
-    //   (b) If no ADMIN_BROADCAST_KEY is set, accept ANY non-empty Bearer
-    //       token. Supabase's gateway has already validated that the
-    //       token belongs to this project before we run.
+    // ----- 1. Verify caller is an admin -----
     const auth = req.headers.get("Authorization") || "";
-    const presented = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
-    const adminKey = (Deno.env.get("ADMIN_BROADCAST_KEY") || "").trim();
-
-    const isOk = adminKey
-      ? presented === adminKey
-      : presented.length > 0;
-
-    if (!isOk) {
-      return jsonResponse(
-        {
-          error: adminKey
-            ? "Unauthorized [v3] — ADMIN_BROADCAST_KEY required"
-            : "Unauthorized [v3] — Bearer token required",
-        },
-        401
-      );
+    const jwt = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
+    if (!jwt) {
+      return jsonResponse({ error: "Missing Authorization Bearer token" }, 401);
     }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    // Service client for DB writes (bypasses RLS)
+    const supabase = createClient(supabaseUrl, serviceKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
+    // Verify the JWT and pull the auth user
+    const { data: userData, error: userErr } = await supabase.auth.getUser(jwt);
+    if (userErr || !userData?.user?.id) {
+      return jsonResponse({ error: "Invalid Bearer token" }, 401);
+    }
+
+    // Check they're in admin_users
+    const { data: adminRow, error: adminErr } = await supabase
+      .from("admin_users")
+      .select("id")
+      .eq("auth_user_id", userData.user.id)
+      .maybeSingle();
+
+    if (adminErr || !adminRow?.id) {
+      return jsonResponse({ error: "Admin access required" }, 403);
+    }
+    const adminId: string = adminRow.id;
 
     // ----- 2. Parse body -----
     const body = await req.json().catch(() => ({}));
-    const title: string = body.title?.trim();
-    const messageBody: string = body.body?.trim();
+    const title: string = (body.title || "").trim();
+    const messageBody: string = (body.body || "").trim();
     const route: string | undefined = body.route;
-    const recipients: "all" | string[] = body.recipients ?? "all";
     const type: string = body.type ?? "broadcast";
+
+    // Support both new "filter" and legacy "recipients"
+    let filter: Record<string, unknown>;
+    if (body.filter && typeof body.filter === "object") {
+      filter = body.filter;
+    } else if (Array.isArray(body.recipients)) {
+      filter = { mode: "ids", ids: body.recipients };
+    } else {
+      filter = { mode: "all" };
+    }
 
     if (!title || !messageBody) {
       return jsonResponse({ error: "title and body are required" }, 400);
     }
-    if (
-      recipients !== "all" &&
-      !(Array.isArray(recipients) && recipients.every((id) => typeof id === "string"))
-    ) {
+
+    // ----- 3. Resolve recipients via the SQL RPC -----
+    const { data: resolvedRows, error: resolveErr } = await supabase.rpc(
+      "resolve_broadcast_recipients",
+      { filter }
+    );
+    if (resolveErr) {
       return jsonResponse(
-        { error: "recipients must be 'all' or an array of customer_id strings" },
-        400
+        { error: `recipient resolution failed: ${resolveErr.message}` },
+        500
       );
     }
+    const customerIds: string[] = (resolvedRows || [])
+      .map((r: { customer_id: string }) => r.customer_id)
+      .filter(Boolean);
 
-    // ----- 3. Resolve recipient set -----
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-      { auth: { autoRefreshToken: false, persistSession: false } }
-    );
+    const recipientCount = customerIds.length;
 
-    let customerQuery = supabase
-      .from("customers")
-      .select("id, notifications_enabled");
-    if (recipients !== "all") {
-      customerQuery = customerQuery.in("id", recipients);
+    // ----- 4. Pull customers w/ notifications_enabled flag -----
+    let enabledCustomerIds: string[] = [];
+    let disabledCount = 0;
+
+    if (customerIds.length > 0) {
+      const { data: customers, error: custErr } = await supabase
+        .from("customers")
+        .select("id, notifications_enabled")
+        .in("id", customerIds);
+
+      if (custErr) {
+        return jsonResponse({ error: `customer lookup failed: ${custErr.message}` }, 500);
+      }
+
+      enabledCustomerIds = (customers || [])
+        .filter((c) => c.notifications_enabled !== false)
+        .map((c) => c.id);
+      disabledCount = (customers || []).length - enabledCustomerIds.length;
     }
-    const { data: customers, error: custErr } = await customerQuery;
-    if (custErr) {
-      return jsonResponse({ error: `customer lookup failed: ${custErr.message}` }, 500);
-    }
 
-    const enabledCustomerIds = (customers || [])
-      .filter((c) => c.notifications_enabled !== false)
-      .map((c) => c.id);
-    const disabledCount = (customers || []).length - enabledCustomerIds.length;
-
-    // ----- 4. In-app notification rows for EVERY targeted customer
-    //         (even those with notifications_enabled=false, so they see
-    //         the message next time they open the app)
-    const inAppRows = (customers || []).map((c) => ({
-      customer_id: c.id,
+    // ----- 5. In-app notification rows for EVERY targeted customer
+    //         (even those with notifications_enabled=false, so they still
+    //          see the message inside the app)
+    const inAppRows = customerIds.map((id) => ({
+      customer_id: id,
       type,
       title,
       body: messageBody,
@@ -146,81 +185,90 @@ serve(async (req) => {
       }
     }
 
-    if (enabledCustomerIds.length === 0) {
-      return jsonResponse({
-        sent: 0,
-        skipped_disabled: disabledCount,
-        skipped_no_token: 0,
-        in_app_inserted: inAppInsertedCount,
-        note: "no customers eligible for push",
-      });
+    // ----- 6. Push to Expo for enabled customers w/ devices -----
+    let sentCount = 0;
+    let noTokenCount = 0;
+    const expoTickets: unknown[] = [];
+
+    if (enabledCustomerIds.length > 0) {
+      const { data: devices } = await supabase
+        .from("customer_devices")
+        .select("expo_push_token, customer_id")
+        .in("customer_id", enabledCustomerIds);
+
+      const tokens = (devices || [])
+        .map((d) => d.expo_push_token)
+        .filter((t): t is string => !!t);
+
+      const customersWithTokens = new Set(
+        (devices || []).map((d) => d.customer_id)
+      );
+      noTokenCount = enabledCustomerIds.filter(
+        (id) => !customersWithTokens.has(id)
+      ).length;
+
+      if (tokens.length > 0) {
+        const data: Record<string, unknown> = { type };
+        if (route) data.route = route;
+
+        const messages = tokens.map((to) => ({
+          to,
+          title,
+          body: messageBody,
+          sound: "default",
+          priority: "high",
+          data,
+          channelId: "default",
+        }));
+
+        // Expo accepts up to 100 messages per batch
+        for (let i = 0; i < messages.length; i += 100) {
+          const chunk = messages.slice(i, i + 100);
+          const res = await fetch("https://exp.host/--/api/v2/push/send", {
+            method: "POST",
+            headers: {
+              Accept: "application/json",
+              "Accept-encoding": "gzip, deflate",
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(chunk),
+          });
+          const json = await res.json().catch(() => ({}));
+          expoTickets.push(json);
+        }
+
+        sentCount = tokens.length;
+
+        // Mark devices as recently active
+        await supabase
+          .from("customer_devices")
+          .update({ last_seen_at: new Date().toISOString() })
+          .in("expo_push_token", tokens);
+      }
     }
 
-    // ----- 5. Pull every push token for the enabled customers -----
-    const { data: devices } = await supabase
-      .from("customer_devices")
-      .select("expo_push_token, customer_id")
-      .in("customer_id", enabledCustomerIds);
-
-    const tokens = (devices || [])
-      .map((d) => d.expo_push_token)
-      .filter((t): t is string => !!t);
-
-    const customersWithTokens = new Set((devices || []).map((d) => d.customer_id));
-    const noTokenCount = enabledCustomerIds.filter(
-      (id) => !customersWithTokens.has(id)
-    ).length;
-
-    if (tokens.length === 0) {
-      return jsonResponse({
-        sent: 0,
+    // ----- 7. Log this broadcast -----
+    const { data: bcastRow } = await supabase
+      .from("broadcasts")
+      .insert({
+        title,
+        body: messageBody,
+        route: route || null,
+        filter,
+        sent_by: adminId,
+        recipient_count: recipientCount,
+        sent_count: sentCount,
         skipped_disabled: disabledCount,
         skipped_no_token: noTokenCount,
         in_app_inserted: inAppInsertedCount,
-        note: "no devices registered for the eligible customers",
-      });
-    }
-
-    // ----- 6. Build push messages -----
-    // Expo accepts up to 100 messages per batch — chunk if larger.
-    const data: Record<string, unknown> = { type };
-    if (route) data.route = route;
-
-    const messages = tokens.map((to) => ({
-      to,
-      title,
-      body: messageBody,
-      sound: "default",
-      priority: "high",
-      data,
-      channelId: "default",
-    }));
-
-    // ----- 7. POST to Expo Push API in chunks of 100 -----
-    const expoTickets: unknown[] = [];
-    for (let i = 0; i < messages.length; i += 100) {
-      const chunk = messages.slice(i, i + 100);
-      const res = await fetch("https://exp.host/--/api/v2/push/send", {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Accept-encoding": "gzip, deflate",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(chunk),
-      });
-      const json = await res.json().catch(() => ({}));
-      expoTickets.push(json);
-    }
-
-    // Mark these devices as recently active
-    await supabase
-      .from("customer_devices")
-      .update({ last_seen_at: new Date().toISOString() })
-      .in("expo_push_token", tokens);
+      })
+      .select("id")
+      .maybeSingle();
 
     return jsonResponse({
-      sent: tokens.length,
+      broadcast_id: bcastRow?.id ?? null,
+      recipient_count: recipientCount,
+      sent: sentCount,
       skipped_disabled: disabledCount,
       skipped_no_token: noTokenCount,
       in_app_inserted: inAppInsertedCount,
