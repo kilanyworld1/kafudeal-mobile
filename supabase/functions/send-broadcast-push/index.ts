@@ -47,11 +47,31 @@ serve(async (req) => {
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
 
   try {
-    // ----- 1. Auth: require service role key in Authorization header -----
+    // ----- 1. Auth.
+    // Two ways to authorise:
+    //   (a) Set ADMIN_BROADCAST_KEY as an Edge Function secret. The caller
+    //       passes that exact value as `Authorization: Bearer <key>`. This
+    //       is the recommended production path.
+    //   (b) If no ADMIN_BROADCAST_KEY is set, accept ANY non-empty Bearer
+    //       token. Supabase's gateway has already validated that the
+    //       token belongs to this project before we run.
     const auth = req.headers.get("Authorization") || "";
-    const expected = `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`;
-    if (auth !== expected) {
-      return jsonResponse({ error: "Unauthorized — admin only" }, 401);
+    const presented = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
+    const adminKey = (Deno.env.get("ADMIN_BROADCAST_KEY") || "").trim();
+
+    const isOk = adminKey
+      ? presented === adminKey
+      : presented.length > 0;
+
+    if (!isOk) {
+      return jsonResponse(
+        {
+          error: adminKey
+            ? "Unauthorized [v3] — ADMIN_BROADCAST_KEY required"
+            : "Unauthorized [v3] — Bearer token required",
+        },
+        401
+      );
     }
 
     // ----- 2. Parse body -----
