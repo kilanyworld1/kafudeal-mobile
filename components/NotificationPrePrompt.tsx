@@ -1,28 +1,29 @@
 /**
  * Friendly "Want order updates?" pre-prompt.
  *
- * Android (API 33+) shows its own POST_NOTIFICATIONS system dialog — but
- * that dialog can't be re-shown if the user denies it. So we show OUR
- * dialog first with a clear value prop, and only call requestPermission()
- * when they tap "Yes". This is the recommended Android UX pattern.
+ * Two flavours:
+ *  - status === 'undetermined' → standard pre-prompt, the "Yes" button
+ *    triggers the OS permission dialog.
+ *  - status === 'denied' + canAskAgain → same pre-prompt, the "Yes"
+ *    button can still trigger the OS dialog (it'll re-prompt).
+ *  - status === 'denied' + canAskAgain === false → the OS won't let us
+ *    re-prompt. We change the CTA copy and tap-action to "Open Settings"
+ *    so the user can flip the toggle manually. This is the path for
+ *    Huawei/OnePlus/Xiaomi/Oppo etc. that default to "deny" at install.
  *
- * iOS shows its own system permission dialog too, but only ONCE — same
- * deal: prep the user with our copy first.
+ * Hides if status === 'granted' — nothing to do.
  *
  * Triggers:
- *   - After sign-in, home screen mounts, customer is set
- *   - Permission status is "undetermined" (never asked)
- *   - We've shown the user a few products (5s delay so we don't ambush them)
- *
- * If user declines, checkout.tsx will re-prompt after the first successful
- * order — that's the second-chance moment.
+ *   - Customer is set
+ *   - 5s delay so we don't ambush them
+ *   - Not already asked in this app install (AsyncStorage flag)
  */
 
 import { useEffect, useRef, useState } from "react";
-import { Modal, View, Text, Pressable, StyleSheet, Animated, Easing } from "react-native";
+import { Modal, View, Text, Pressable, StyleSheet, Animated, Easing, Linking, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import * as Notifications from "expo-notifications";
 import {
-  getPermissionStatus,
   hasBeenAsked,
   requestPermission,
   registerDeviceForCustomer,
@@ -34,9 +35,12 @@ type Props = {
   delayMs?: number;
 };
 
+type Mode = "ask" | "openSettings";
+
 export default function NotificationPrePrompt({ delayMs = 5000 }: Props) {
   const { customer } = useAuth();
   const [visible, setVisible] = useState(false);
+  const [mode, setMode] = useState<Mode>("ask");
   const fade = useRef(new Animated.Value(0)).current;
   const slide = useRef(new Animated.Value(40)).current;
 
@@ -47,8 +51,22 @@ export default function NotificationPrePrompt({ delayMs = 5000 }: Props) {
       if (!customer?.id) return;
       const asked = await hasBeenAsked();
       if (cancelled || asked) return;
-      const status = await getPermissionStatus();
-      if (cancelled || status !== "undetermined") return;
+
+      const perms = await Notifications.getPermissionsAsync();
+      if (cancelled) return;
+
+      // Already granted — nothing to do; auth-context will register token.
+      if (perms.status === "granted") return;
+
+      // Denied with no way to re-ask → switch to "Open Settings" mode
+      // so the user can flip the toggle from the OS app info page.
+      // Common on OnePlus / Huawei / Xiaomi / Oppo where the OS defaults
+      // to deny at install time.
+      const canReAsk = perms.canAskAgain !== false;
+      const isDeniedHard = perms.status === "denied" && !canReAsk;
+
+      setMode(isDeniedHard ? "openSettings" : "ask");
+
       timer = setTimeout(() => {
         if (cancelled) return;
         setVisible(true);
@@ -72,6 +90,17 @@ export default function NotificationPrePrompt({ delayMs = 5000 }: Props) {
   };
 
   const accept = async () => {
+    if (mode === "openSettings") {
+      // OS won't let us re-prompt — best we can do is bounce to Settings.
+      try {
+        await Linking.openSettings();
+      } catch {
+        // ignore
+      }
+      close();
+      return;
+    }
+
     const status = await requestPermission();
     if (status === "granted" && customer?.id) {
       await registerDeviceForCustomer(customer.id);
@@ -80,13 +109,19 @@ export default function NotificationPrePrompt({ delayMs = 5000 }: Props) {
   };
 
   const decline = async () => {
-    // Still mark "asked" so we don't re-prompt on every home mount.
-    // Checkout will offer a second chance after order success.
+    // Mark "asked" so we don't pester them every home mount. Checkout
+    // still has a second-chance prompt after their first successful order.
     await requestPermission().catch(() => {});
     close();
   };
 
   if (!visible) return null;
+
+  const acceptLabel = mode === "openSettings" ? "Open Settings" : "Yes, notify me";
+  const bodyText =
+    mode === "openSettings"
+      ? `Notifications are turned off for KafuDeal in your ${Platform.OS === "ios" ? "iPhone" : "phone"} settings. Open Settings to allow them so we can keep you updated about your orders.`
+      : "Get notified when your order is confirmed, on its way, and delivered. You can change this anytime in Settings.";
 
   return (
     <Modal transparent visible animationType="none" onRequestClose={close}>
@@ -97,12 +132,9 @@ export default function NotificationPrePrompt({ delayMs = 5000 }: Props) {
             <Ionicons name="notifications" size={28} color="#FF6B2C" />
           </View>
           <Text style={s.title}>Stay on top of your orders</Text>
-          <Text style={s.body}>
-            Get notified when your order is confirmed, on its way, and delivered.
-            You can change this anytime in Settings.
-          </Text>
+          <Text style={s.body}>{bodyText}</Text>
           <Pressable onPress={accept} style={s.acceptBtn}>
-            <Text style={s.acceptText}>Yes, notify me</Text>
+            <Text style={s.acceptText}>{acceptLabel}</Text>
           </Pressable>
           <Pressable onPress={decline} style={s.declineBtn}>
             <Text style={s.declineText}>Maybe later</Text>
