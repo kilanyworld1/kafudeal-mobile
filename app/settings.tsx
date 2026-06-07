@@ -1,14 +1,31 @@
 import { useState } from "react";
-import { View, Text, ScrollView, Pressable, Switch, StyleSheet, Alert, ActivityIndicator } from "react-native";
+import {
+  View,
+  Text,
+  ScrollView,
+  Pressable,
+  Switch,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
+  Modal,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../lib/auth-context";
 import { deleteMyAccount } from "../lib/account-deletion";
+import {
+  setLanguage,
+  getCurrentLanguage,
+  type SupportedLanguage,
+} from "../lib/i18n";
 
 export default function Settings() {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const { user, signOut } = useAuth();
   const [pushOrder, setPushOrder] = useState(true);
   const [pushDeals, setPushDeals] = useState(true);
@@ -17,6 +34,12 @@ export default function Settings() {
   const [sms, setSms] = useState(false);
   const [biometric, setBiometric] = useState(true);
   const [deleting, setDeleting] = useState(false);
+  const [langPickerOpen, setLangPickerOpen] = useState(false);
+  const [switchingLang, setSwitchingLang] = useState(false);
+
+  const currentLang = getCurrentLanguage();
+  const currentLangLabel =
+    currentLang === "ar" ? t("account.language_arabic") : t("account.language_english");
 
   const comingSoon = (feature: string) =>
     Alert.alert(`${feature}`, "Coming soon — we're working on this.");
@@ -24,11 +47,30 @@ export default function Settings() {
   const openTerms = () => WebBrowser.openBrowserAsync("https://kafudeal.com/terms.html");
   const openPrivacy = () => WebBrowser.openBrowserAsync("https://kafudeal.com/privacy.html");
 
+  const handleLanguageChange = async (lang: SupportedLanguage) => {
+    setLangPickerOpen(false);
+    if (lang === currentLang) return;
+    setSwitchingLang(true);
+    try {
+      const { willReload } = await setLanguage(lang);
+      if (!willReload) {
+        // Same direction (LTR↔LTR or RTL↔RTL) — no reload needed.
+        // The hook will re-render with the new strings.
+      }
+      // If willReload is true, the app is already restarting — no further action.
+    } catch (e) {
+      console.warn("Language change failed:", e);
+      Alert.alert("Error", "Could not switch language. Try again.");
+    } finally {
+      setSwitchingLang(false);
+    }
+  };
+
   const handleSignOut = () => {
-    Alert.alert("Sign out", "Are you sure you want to sign out?", [
-      { text: "Cancel", style: "cancel" },
+    Alert.alert(t("auth.sign_out"), "Are you sure you want to sign out?", [
+      { text: t("common.cancel"), style: "cancel" },
       {
-        text: "Sign out",
+        text: t("auth.sign_out"),
         style: "destructive",
         onPress: async () => {
           await signOut();
@@ -40,20 +82,19 @@ export default function Settings() {
 
   const handleDeleteAccount = () => {
     Alert.alert(
-      "Delete account",
+      t("account.delete_account"),
       "This will permanently delete your account, profile, cart, saved items, and notifications. Past orders will be kept in our records for legal and accounting purposes but will no longer be linked to your account.\n\nThis cannot be undone. Are you sure?",
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t("common.cancel"), style: "cancel" },
         {
-          text: "Delete",
+          text: t("common.delete"),
           style: "destructive",
           onPress: () => {
-            // Second confirmation to prevent accidental deletion
             Alert.alert(
               "Final confirmation",
               "Type-confirm not required, but this is your last chance. Delete account?",
               [
-                { text: "Cancel", style: "cancel" },
+                { text: t("common.cancel"), style: "cancel" },
                 {
                   text: "Yes, delete forever",
                   style: "destructive",
@@ -69,11 +110,11 @@ export default function Settings() {
                       return;
                     }
                     Alert.alert(
-                      "Account deleted",
+                      t("account.deleted"),
                       "Your account and all associated data have been deleted. Sorry to see you go 👋",
                       [
                         {
-                          text: "OK",
+                          text: t("common.ok"),
                           onPress: async () => {
                             await signOut();
                             router.replace("/(tabs)");
@@ -97,13 +138,13 @@ export default function Settings() {
         <Pressable onPress={() => router.back()} style={s.iconBtn} hitSlop={12}>
           <Ionicons name="chevron-back" size={24} color="#0F172A" />
         </Pressable>
-        <Text style={s.topTitle}>Settings</Text>
+        <Text style={s.topTitle}>{t("account.settings")}</Text>
         <View style={{ width: 36 }} />
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: 60 }}>
         {/* Account */}
-        <Text style={s.section}>ACCOUNT</Text>
+        <Text style={s.section}>{t("account.title").toUpperCase()}</Text>
         <View style={s.group}>
           <Row icon="person-outline" label="Personal info" onPress={() => comingSoon("Personal info")} />
           <Row icon="lock-closed-outline" label="Password & security" onPress={() => comingSoon("Password & security")} />
@@ -118,7 +159,7 @@ export default function Settings() {
         </View>
 
         {/* Notifications */}
-        <Text style={s.section}>NOTIFICATIONS</Text>
+        <Text style={s.section}>{t("account.notifications").toUpperCase()}</Text>
         <View style={s.group}>
           <Row icon="cube-outline" label="Order updates" toggle value={pushOrder} onChange={setPushOrder} />
           <Row icon="flame-outline" label="Flash deals & offers" toggle value={pushDeals} onChange={setPushDeals} />
@@ -134,7 +175,12 @@ export default function Settings() {
         {/* Preferences */}
         <Text style={s.section}>PREFERENCES</Text>
         <View style={s.group}>
-          <Row icon="language-outline" label="Language" value2="English" onPress={() => comingSoon("Language")} />
+          <Row
+            icon="language-outline"
+            label={t("account.language")}
+            value2={currentLangLabel}
+            onPress={() => setLangPickerOpen(true)}
+          />
           <Row icon="cash-outline" label="Currency" value2="AED" onPress={() => comingSoon("Currency")} />
           <Row icon="moon-outline" label="Theme" value2="Light" onPress={() => comingSoon("Theme")} last />
         </View>
@@ -142,16 +188,16 @@ export default function Settings() {
         {/* Legal */}
         <Text style={s.section}>LEGAL</Text>
         <View style={s.group}>
-          <Row icon="document-text-outline" label="Terms of service" onPress={openTerms} />
-          <Row icon="shield-outline" label="Privacy policy" onPress={openPrivacy} />
+          <Row icon="document-text-outline" label={t("auth.terms")} onPress={openTerms} />
+          <Row icon="shield-outline" label={t("auth.privacy")} onPress={openPrivacy} />
           <Row
             icon="information-circle-outline"
             label="About KafuDeal"
-            value2="v0.11.0"
+            value2="v0.13.0"
             onPress={() =>
               Alert.alert(
                 "About KafuDeal",
-                "KafuDeal v0.11.0\nMade with 💛 in the UAE\n\nWe rescue near-expiry groceries from waste and pass the savings to you."
+                "KafuDeal v0.13.0\nMade with 💛 in the UAE\n\nWe rescue near-expiry groceries from waste and pass the savings to you."
               )
             }
             last
@@ -162,7 +208,7 @@ export default function Settings() {
           <>
             <Pressable onPress={handleSignOut} style={s.signoutBtn} disabled={deleting}>
               <Ionicons name="log-out-outline" size={20} color="#DC2626" />
-              <Text style={s.signoutText}>Sign out</Text>
+              <Text style={s.signoutText}>{t("auth.sign_out")}</Text>
             </Pressable>
 
             {/* Account deletion required by Apple App Store guideline 5.1.1(v) */}
@@ -176,7 +222,7 @@ export default function Settings() {
               ) : (
                 <>
                   <Ionicons name="trash-outline" size={18} color="#DC2626" />
-                  <Text style={s.deleteText}>Delete my account</Text>
+                  <Text style={s.deleteText}>{t("account.delete_account")}</Text>
                 </>
               )}
             </Pressable>
@@ -189,7 +235,72 @@ export default function Settings() {
 
         <Text style={s.footer}>Made with 💛 in the UAE</Text>
       </ScrollView>
+
+      {/* Language picker modal */}
+      <Modal
+        transparent
+        visible={langPickerOpen}
+        animationType="fade"
+        onRequestClose={() => setLangPickerOpen(false)}
+      >
+        <Pressable style={s.modalBackdrop} onPress={() => setLangPickerOpen(false)}>
+          <Pressable style={s.langCard} onPress={(e) => e.stopPropagation()}>
+            <Text style={s.langTitle}>{t("account.language")}</Text>
+            <LangOption
+              label={t("account.language_english")}
+              flag="🇬🇧"
+              selected={currentLang === "en"}
+              onPress={() => handleLanguageChange("en")}
+            />
+            <LangOption
+              label={t("account.language_arabic")}
+              flag="🇦🇪"
+              selected={currentLang === "ar"}
+              onPress={() => handleLanguageChange("ar")}
+            />
+            <Pressable
+              onPress={() => setLangPickerOpen(false)}
+              style={s.langCancel}
+            >
+              <Text style={s.langCancelText}>{t("common.cancel")}</Text>
+            </Pressable>
+            <Text style={s.langNote}>
+              {t("common.loading") /* TODO i18n key for restart message */}
+            </Text>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Switching language spinner */}
+      {switchingLang && (
+        <View style={s.switchingOverlay}>
+          <ActivityIndicator size="large" color="#FF6B2C" />
+        </View>
+      )}
     </View>
+  );
+}
+
+function LangOption({
+  label,
+  flag,
+  selected,
+  onPress,
+}: {
+  label: string;
+  flag: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[s.langOption, selected && s.langOptionSelected]}
+    >
+      <Text style={s.langFlag}>{flag}</Text>
+      <Text style={[s.langLabel, selected && s.langLabelSelected]}>{label}</Text>
+      {selected && <Ionicons name="checkmark" size={20} color="#FF6B2C" />}
+    </Pressable>
   );
 }
 
@@ -214,7 +325,7 @@ function Row({
 }) {
   return (
     <Pressable onPress={onPress} style={[s.row, !last && s.rowBorder]}>
-      <Ionicons name={icon} size={20} color="#64748B" style={{ marginRight: 14 }} />
+      <Ionicons name={icon} size={20} color="#64748B" style={{ marginEnd: 14 }} />
       <Text style={s.rowLabel}>{label}</Text>
       {toggle ? (
         <Switch
@@ -250,7 +361,7 @@ const s = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14 },
   rowBorder: { borderBottomWidth: 0.5, borderBottomColor: "rgba(15,23,42,0.06)" },
   rowLabel: { flex: 1, fontSize: 14, color: "#0F172A", fontWeight: "600" },
-  rowValue: { fontSize: 13, color: "#64748B", marginRight: 6 },
+  rowValue: { fontSize: 13, color: "#64748B", marginEnd: 6 },
   signoutBtn: {
     flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
     marginHorizontal: 16, marginTop: 24, padding: 14,
@@ -269,4 +380,39 @@ const s = StyleSheet.create({
     paddingHorizontal: 32, marginTop: 8, lineHeight: 16,
   },
   footer: { textAlign: "center", color: "#94A3B8", fontSize: 11, marginTop: 24 },
+  // Language picker
+  modalBackdrop: {
+    flex: 1, backgroundColor: "rgba(15,23,42,0.5)",
+    justifyContent: "center", alignItems: "center", padding: 24,
+  },
+  langCard: {
+    backgroundColor: "white", borderRadius: 20, padding: 20, width: "100%",
+    maxWidth: 360, shadowColor: "#000", shadowOpacity: 0.12,
+    shadowRadius: 24, shadowOffset: { width: 0, height: 8 }, elevation: 12,
+  },
+  langTitle: {
+    fontSize: 17, fontWeight: "800", color: "#0F172A",
+    textAlign: "center", marginBottom: 12,
+  },
+  langOption: {
+    flexDirection: "row", alignItems: "center", gap: 12,
+    paddingVertical: 14, paddingHorizontal: 14, borderRadius: 12,
+    borderWidth: 1, borderColor: "#E2E8F0", marginBottom: 8,
+  },
+  langOptionSelected: { borderColor: "#FF6B2C", backgroundColor: "#FFF4EC" },
+  langFlag: { fontSize: 22 },
+  langLabel: { flex: 1, fontSize: 15, color: "#0F172A", fontWeight: "600" },
+  langLabelSelected: { color: "#FF6B2C" },
+  langCancel: {
+    marginTop: 8, paddingVertical: 12, alignItems: "center",
+  },
+  langCancelText: { color: "#64748B", fontSize: 13.5, fontWeight: "700" },
+  langNote: {
+    fontSize: 11, color: "#94A3B8", textAlign: "center", marginTop: 4,
+  },
+  switchingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(255,255,255,0.7)",
+    justifyContent: "center", alignItems: "center",
+  },
 });

@@ -1,0 +1,245 @@
+{
+  "common": {
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "ok": "موافق",
+    "done": "تم",
+    "close": "إغلاق",
+    "edit": "تعديل",
+    "delete": "حذف",
+    "remove": "إزالة",
+    "confirm": "تأكيد",
+    "back": "رجوع",
+    "next": "التالي",
+    "continue": "متابعة",
+    "loading": "جاري التحميل...",
+    "search": "بحث",
+    "filter": "تصفية",
+    "apply": "تطبيق",
+    "clear": "مسح",
+    "add": "إضافة",
+    "view_all": "عرض الكل",
+    "see_all": "اعرض الكل",
+    "retry": "إعادة المحاولة",
+    "change": "تغيير"
+  },
+  "auth": {
+    "sign_in": "تسجيل الدخول",
+    "sign_up": "إنشاء حساب",
+    "sign_out": "تسجيل الخروج",
+    "welcome": "مرحباً",
+    "welcome_back": "مرحباً بعودتك",
+    "welcome_kafudeal": "أهلاً بك في كافوديل",
+    "continue_google": "المتابعة عبر Google",
+    "continue_apple": "المتابعة عبر Apple",
+    "or_continue": "أو تابع باستخدام",
+    "agree_terms": "بتسجيل الدخول فإنك توافق على",
+    "terms": "الشروط والأحكام",
+    "privacy": "سياسة الخصوصية",
+    "sign_in_failed": "فشل تسجيل الدخول",
+    "signed_in": "تم تسجيل الدخول",
+    "signed_out": "تم تسجيل الخروج"
+  },
+  "home": {
+    "search_placeholder": "ابحث عن المنتجات",
+    "categories": "الفئات",
+    "all_categories": "الكل",
+    "featured_deals": "عروض مميزة",
+    "expiring_soon": "تنتهي صلاحيته قريباً",
+    "deliver_to": "التوصيل إلى",
+    "change_address": "تغيير",
+    "no_deals": "لا توجد عروض",
+    "browse_deals": "تصفح العروض"
+  },
+  "product": {
+    "add_to_cart": "أضف إلى السلة",
+    "added_to_cart": "تمت الإضافة إلى السلة",
+    "save": "حفظ",
+    "saved": "محفوظ",
+    "original_price": "السعر الأصلي",
+    "discount": "الخصم",
+    "you_save": "توفر",
+    "quantity": "الكمية",
+    "in_stock": "متوفر",
+    "out_of_stock": "غير متوفر",
+    "low_stock": "الكمية محدودة",
+    "expires_on": "تنتهي صلاحيته في",
+    "about": "عن هذا المنتج",
+    "not_found": "المنتج غير موجود"
+  },
+  "cart": {
+    "title": "السلة",
+    "your_cart": "سلتك",
+    "empty": "سلتك فارغة",
+    "subtotal": "المجموع الفرعي",
+    "delivery_fee": "رسوم التوصيل",
+    "total": "المجموع",
+    "items_count": "{{count}} عناصر",
+    "item_count_one": "عنصر واحد",
+    "continue_shopping": "متابعة التسوق",
+    "checkout": "إتمام الطلب",
+    "removed_from_cart": "تمت الإزالة من السلة"
+  },
+  "checkout": {
+    "title": "إتمام الطلب",
+    "delivery_address": "عنوان التوصيل",
+    "payment_method": "طريقة الدفع",
+    "cash_on_delivery": "الدفع عند الاستلام",
+    "card": "بطاقة ائتمان أو خصم",
+    "order_summary": "ملخص الطلب",
+    "place_order": "تأكيد الطلب",
+    "order_placed": "تم تأكيد الطلب!",
+    "voucher_code": "كود الخصم",
+    "apply_voucher": "تطبيق",
+    "delivery_notes": "ملاحظات التوصيل (اختياري)",
+    "processing": "جاري معالجة طلبك..."
+  },
+  "orders": {
+    "title": "الطلبات",
+    "my_orders": "طلباتي",
+    "active": "نشطة",
+    "past": "السابقة",
+    "order_number": "طلب رقم {{id}}",
+    "track": "تتبع الطلب",
+    "details": "تفاصيل الطلب",
+    "date": "تاريخ الطلب",
+    "delivery_to": "التوصيل إلى",
+    "reorder": "إعادة الطلب",
+    "no_orders": "لا توجد طلبات بعد",
+    "start_shopping": "ابدأ التسوق",
+    "cancel_order": "إلغاء الطلب",
+    "need_help": "بحاجة للمساعدة؟",
+    "contact_support": "تواصل مع الدعم"
+  },
+  "status": {
+    "new": "جديد",
+    "confirmed": "مؤكد",
+    "preparing": "قيد التحضير",
+    "out_for_delivery": "في الطريق",
+    "delivered": "تم التوصيل",
+    "cancelled": "ملغي"
+  },
+  "addresses": {
+    "title": "العناوين",
+    "my_addresses": "عناويني",
+    "add_new": "إضافة عنوان جديد",
+    "add": "إضافة عنوان",
+    "edit": "تعديل العنوان",
+    "delete": "حذف العنوان",
+    "default": "افتراضي",
+    "set_default": "تعيين كافتراضي",
+    "use_current_location": "استخدم موقعي الحالي",
+    "label": "تسمية العنوان",
+    "label_home": "المنزل",
+    "label_work": "العمل",
+    "label_other": "أخرى",
+    "city": "المدينة",
+    "address_line": "المبنى / الشارع",
+    "phone": "الهاتف (اختياري)",
+    "no_addresses": "لا توجد عناوين بعد",
+    "saved": "تم حفظ العنوان",
+    "deleted": "تم حذف العنوان",
+    "updated": "تم تحديث العنوان"
+  },
+  "account": {
+    "title": "الحساب",
+    "profile": "الملف الشخصي",
+    "settings": "الإعدادات",
+    "name": "الاسم",
+    "email": "البريد الإلكتروني",
+    "phone": "الهاتف",
+    "language": "اللغة",
+    "language_english": "English",
+    "language_arabic": "العربية",
+    "notifications": "الإشعارات",
+    "help_support": "المساعدة والدعم",
+    "about": "حول التطبيق",
+    "version": "الإصدار",
+    "delete_account": "حذف حسابي",
+    "delete_confirm": "هل أنت متأكد؟ لا يمكن التراجع عن هذا.",
+    "deleted": "تم حذف الحساب",
+    "contact_support": "تواصل مع الدعم",
+    "follow_ig": "تابعنا على Instagram"
+  },
+  "notifications": {
+    "title": "الإشعارات",
+    "empty": "لا توجد إشعارات",
+    "mark_read": "وضع علامة كمقروء",
+    "mark_all_read": "وضع علامة الكل كمقروء"
+  },
+  "notif_prompt": {
+    "title": "ابقَ على اطلاع بطلباتك",
+    "body": "احصل على إشعارات عند تأكيد طلبك، خروجه للتوصيل، وتسليمه. يمكنك تغيير ذلك في الإعدادات.",
+    "accept": "نعم، أرسل لي الإشعارات",
+    "maybe_later": "ربما لاحقاً",
+    "open_settings": "فتح الإعدادات",
+    "denied_body": "الإشعارات معطلة لـ كافوديل في إعدادات هاتفك. افتح الإعدادات للسماح بها."
+  },
+  "push": {
+    "order_confirmed": {
+      "title": "تم تأكيد طلبك ✅",
+      "body": "استلمنا طلبك وتم تأكيده."
+    },
+    "preparing": {
+      "title": "جاري تحضير طلبك 👨‍🍳",
+      "body": "المتجر يحضّر طلبك الآن."
+    },
+    "out_for_delivery": {
+      "title": "طلبك في الطريق إليك 🛵",
+      "body": "السائق في طريقه إلى عنوانك."
+    },
+    "delivered": {
+      "title": "تم تسليم طلبك ✅",
+      "body": "بالهنا! اضغط لتقييم طلبك."
+    },
+    "cancelled": {
+      "title": "تم إلغاء طلبك",
+      "body": "تم إلغاء طلبك. اضغط للتفاصيل."
+    }
+  },
+  "saved": {
+    "title": "المحفوظات",
+    "empty": "لا توجد عناصر محفوظة",
+    "item_saved": "تم حفظ العنصر",
+    "item_removed": "تمت الإزالة من المحفوظات"
+  },
+  "toast": {
+    "something_wrong": "حدث خطأ ما",
+    "try_again": "يرجى المحاولة مرة أخرى",
+    "check_connection": "تحقق من اتصالك",
+    "saved_success": "تم الحفظ بنجاح",
+    "could_not_load": "تعذر التحميل",
+    "login_required": "يرجى تسجيل الدخول للمتابعة"
+  },
+  "validation": {
+    "required": "مطلوب",
+    "invalid_email": "بريد إلكتروني غير صحيح",
+    "invalid_phone": "رقم هاتف غير صحيح",
+    "too_short": "قصير جداً"
+  },
+  "category": {
+    "bakery": "المخبوزات",
+    "dairy": "الألبان",
+    "fruits_veg": "الخضار والفواكه",
+    "fruits": "الفواكه",
+    "vegetables": "الخضروات",
+    "pantry": "المؤن",
+    "snacks": "الوجبات الخفيفة",
+    "beverages": "المشروبات",
+    "frozen": "المجمدات",
+    "personal_care": "العناية الشخصية"
+  },
+  "tab": {
+    "home": "الرئيسية",
+    "deals": "العروض",
+    "cart": "السلة",
+    "orders": "الطلبات",
+    "account": "الحساب"
+  },
+  "help": {
+    "title": "المساعدة والدعم",
+    "chat_with_us": "تحدث معنا",
+    "transfer_to_agent": "التحويل إلى موظف الدعم",
+    "faq": "الأسئلة الشائعة"
+  }
+}

@@ -1,0 +1,245 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "ok": "OK",
+    "done": "Done",
+    "close": "Close",
+    "edit": "Edit",
+    "delete": "Delete",
+    "remove": "Remove",
+    "confirm": "Confirm",
+    "back": "Back",
+    "next": "Next",
+    "continue": "Continue",
+    "loading": "Loading...",
+    "search": "Search",
+    "filter": "Filter",
+    "apply": "Apply",
+    "clear": "Clear",
+    "add": "Add",
+    "view_all": "View all",
+    "see_all": "See all",
+    "retry": "Retry",
+    "change": "Change"
+  },
+  "auth": {
+    "sign_in": "Sign in",
+    "sign_up": "Sign up",
+    "sign_out": "Sign out",
+    "welcome": "Welcome",
+    "welcome_back": "Welcome back",
+    "welcome_kafudeal": "Welcome to KafuDeal",
+    "continue_google": "Continue with Google",
+    "continue_apple": "Continue with Apple",
+    "or_continue": "Or continue with",
+    "agree_terms": "By signing in you agree to our",
+    "terms": "Terms & Conditions",
+    "privacy": "Privacy Policy",
+    "sign_in_failed": "Sign in failed",
+    "signed_in": "Signed in",
+    "signed_out": "Signed out"
+  },
+  "home": {
+    "search_placeholder": "Search for products",
+    "categories": "Categories",
+    "all_categories": "All",
+    "featured_deals": "Featured deals",
+    "expiring_soon": "Expiring soon",
+    "deliver_to": "Deliver to",
+    "change_address": "Change",
+    "no_deals": "No deals found",
+    "browse_deals": "Browse deals"
+  },
+  "product": {
+    "add_to_cart": "Add to cart",
+    "added_to_cart": "Added to cart",
+    "save": "Save",
+    "saved": "Saved",
+    "original_price": "Original price",
+    "discount": "Discount",
+    "you_save": "You save",
+    "quantity": "Quantity",
+    "in_stock": "In stock",
+    "out_of_stock": "Out of stock",
+    "low_stock": "Low stock",
+    "expires_on": "Expires on",
+    "about": "About this product",
+    "not_found": "Product not found"
+  },
+  "cart": {
+    "title": "Cart",
+    "your_cart": "Your cart",
+    "empty": "Your cart is empty",
+    "subtotal": "Subtotal",
+    "delivery_fee": "Delivery fee",
+    "total": "Total",
+    "items_count": "{{count}} items",
+    "item_count_one": "1 item",
+    "continue_shopping": "Continue shopping",
+    "checkout": "Checkout",
+    "removed_from_cart": "Removed from cart"
+  },
+  "checkout": {
+    "title": "Checkout",
+    "delivery_address": "Delivery address",
+    "payment_method": "Payment method",
+    "cash_on_delivery": "Cash on delivery",
+    "card": "Credit / Debit card",
+    "order_summary": "Order summary",
+    "place_order": "Place order",
+    "order_placed": "Order placed!",
+    "voucher_code": "Voucher code",
+    "apply_voucher": "Apply",
+    "delivery_notes": "Delivery notes (optional)",
+    "processing": "Processing your order..."
+  },
+  "orders": {
+    "title": "Orders",
+    "my_orders": "My orders",
+    "active": "Active",
+    "past": "Past",
+    "order_number": "Order #{{id}}",
+    "track": "Track order",
+    "details": "Order details",
+    "date": "Order date",
+    "delivery_to": "Delivery to",
+    "reorder": "Reorder",
+    "no_orders": "No orders yet",
+    "start_shopping": "Start shopping",
+    "cancel_order": "Cancel order",
+    "need_help": "Need help?",
+    "contact_support": "Contact support"
+  },
+  "status": {
+    "new": "New",
+    "confirmed": "Confirmed",
+    "preparing": "Preparing",
+    "out_for_delivery": "Out for delivery",
+    "delivered": "Delivered",
+    "cancelled": "Cancelled"
+  },
+  "addresses": {
+    "title": "Addresses",
+    "my_addresses": "My addresses",
+    "add_new": "Add new address",
+    "add": "Add address",
+    "edit": "Edit address",
+    "delete": "Delete address",
+    "default": "Default",
+    "set_default": "Set as default",
+    "use_current_location": "Use my current location",
+    "label": "Address label",
+    "label_home": "Home",
+    "label_work": "Work",
+    "label_other": "Other",
+    "city": "City",
+    "address_line": "Building / Street",
+    "phone": "Phone (optional)",
+    "no_addresses": "No addresses yet",
+    "saved": "Address saved",
+    "deleted": "Address deleted",
+    "updated": "Address updated"
+  },
+  "account": {
+    "title": "Account",
+    "profile": "Profile",
+    "settings": "Settings",
+    "name": "Name",
+    "email": "Email",
+    "phone": "Phone",
+    "language": "Language",
+    "language_english": "English",
+    "language_arabic": "Arabic",
+    "notifications": "Notifications",
+    "help_support": "Help & Support",
+    "about": "About",
+    "version": "Version",
+    "delete_account": "Delete my account",
+    "delete_confirm": "Are you sure? This cannot be undone.",
+    "deleted": "Account deleted",
+    "contact_support": "Contact support",
+    "follow_ig": "Follow us on Instagram"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "empty": "No notifications",
+    "mark_read": "Mark as read",
+    "mark_all_read": "Mark all as read"
+  },
+  "notif_prompt": {
+    "title": "Stay on top of your orders",
+    "body": "Get notified when your order is confirmed, on its way, and delivered. You can change this anytime in Settings.",
+    "accept": "Yes, notify me",
+    "maybe_later": "Maybe later",
+    "open_settings": "Open Settings",
+    "denied_body": "Notifications are turned off for KafuDeal in your phone settings. Open Settings to allow them."
+  },
+  "push": {
+    "order_confirmed": {
+      "title": "Order confirmed ✅",
+      "body": "We've received your order and it's confirmed."
+    },
+    "preparing": {
+      "title": "Preparing your order 👨‍🍳",
+      "body": "The store is preparing your order now."
+    },
+    "out_for_delivery": {
+      "title": "Your order is on the way 🛵",
+      "body": "Your driver is heading to your address."
+    },
+    "delivered": {
+      "title": "Order delivered ✅",
+      "body": "Enjoy! Tap to rate your order."
+    },
+    "cancelled": {
+      "title": "Order cancelled",
+      "body": "Your order has been cancelled. Tap for details."
+    }
+  },
+  "saved": {
+    "title": "Saved",
+    "empty": "No saved items",
+    "item_saved": "Item saved",
+    "item_removed": "Removed from saved"
+  },
+  "toast": {
+    "something_wrong": "Something went wrong",
+    "try_again": "Please try again",
+    "check_connection": "Check your connection",
+    "saved_success": "Saved successfully",
+    "could_not_load": "Could not load",
+    "login_required": "Please sign in to continue"
+  },
+  "validation": {
+    "required": "Required",
+    "invalid_email": "Invalid email",
+    "invalid_phone": "Invalid phone number",
+    "too_short": "Too short"
+  },
+  "category": {
+    "bakery": "Bakery",
+    "dairy": "Dairy",
+    "fruits_veg": "Fruits & Veg",
+    "fruits": "Fruits",
+    "vegetables": "Vegetables",
+    "pantry": "Pantry",
+    "snacks": "Snacks",
+    "beverages": "Beverages",
+    "frozen": "Frozen",
+    "personal_care": "Personal care"
+  },
+  "tab": {
+    "home": "Home",
+    "deals": "Deals",
+    "cart": "Cart",
+    "orders": "Orders",
+    "account": "Account"
+  },
+  "help": {
+    "title": "Help & Support",
+    "chat_with_us": "Chat with us",
+    "transfer_to_agent": "Transfer to an agent",
+    "faq": "FAQ"
+  }
+}

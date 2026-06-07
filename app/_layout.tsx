@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Stack, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -9,6 +9,7 @@ import { AuthProvider } from "../lib/auth-context";
 import { CartProvider } from "../lib/cart-context";
 import { NotificationsProvider } from "../lib/notifications-context";
 import { initCrisp } from "../lib/crisp";
+import { initI18n } from "../lib/i18n";
 
 // Keep the OS splash screen up until we explicitly hide it once fonts
 // finish loading. This removes the brief white flash users saw between
@@ -29,6 +30,16 @@ export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
     Ionicons: IONICONS_FONT,
   });
+
+  // i18n initialization: load translations + apply RTL direction BEFORE
+  // first render. If init fails for any reason, the app still renders in
+  // English (i18n falls back gracefully).
+  const [i18nReady, setI18nReady] = useState(false);
+  useEffect(() => {
+    initI18n()
+      .catch((err) => console.warn("[i18n] init failed:", err))
+      .finally(() => setI18nReady(true));
+  }, []);
 
   // Initialise Crisp once when the app boots.
   useEffect(() => {
@@ -67,9 +78,9 @@ export default function RootLayout() {
     }
   }, [fontsLoaded, fontError]);
 
-  // Don't render until fonts are loaded (or have errored out).
-  // The splash screen stays visible during this window.
-  if (!fontsLoaded && !fontError) {
+  // Don't render until fonts are loaded (or have errored out) AND i18n is
+  // ready. The splash screen stays visible during this window.
+  if ((!fontsLoaded && !fontError) || !i18nReady) {
     return null;
   }
 

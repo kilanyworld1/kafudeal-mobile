@@ -2,7 +2,7 @@
   "expo": {
     "name": "KafuDeal",
     "slug": "kafudeal",
-    "version": "0.12.3",
+    "version": "0.13.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "kafudeal",
@@ -59,7 +59,8 @@
             "buildToolsVersion": "35.0.0"
           }
         }
-      ]
+      ],
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": false
