@@ -1,12 +1,13 @@
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import {
   View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator,
-  Animated, Image, RefreshControl,
+  Animated, Image, RefreshControl, I18nManager,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useFocusEffect } from "expo-router";
+import { useTranslation } from "react-i18next";
 import { productsAPI, categoriesAPI, addressesAPI } from "../../lib/api";
 import { transformProduct, transformCategory } from "../../lib/transformers";
 import type { Product, Category } from "../../lib/types";
@@ -17,18 +18,28 @@ import ProductCard from "../../components/ProductCard";
 import HeaderIconButton from "../../components/HeaderIconButton";
 import NotificationPrePrompt from "../../components/NotificationPrePrompt";
 
-const PHRASES = [
+const PHRASES_EN = [
   "Try 'chocolate'",
   "Try 'sourdough'",
   "Try 'milk 2L'",
   "Try 'iftar deals'",
   "Try 'strawberries'",
 ];
+const PHRASES_AR = [
+  "جرّب 'شوكولاتة'",
+  "جرّب 'خبز'",
+  "جرّب 'حليب 2 لتر'",
+  "جرّب 'عروض الإفطار'",
+  "جرّب 'فراولة'",
+];
 
 const ALL = "All";
 
 export default function Home() {
   const insets = useSafeAreaInsets();
+  const { t, i18n } = useTranslation();
+  const isAr = i18n.language === "ar";
+  const PHRASES = isAr ? PHRASES_AR : PHRASES_EN;
   const { user, customer } = useAuth();
   const { unreadCount } = useNotifications();
   const [placeholder, setPlaceholder] = useState("");
@@ -38,7 +49,9 @@ export default function Home() {
   const [selectedCat, setSelectedCat] = useState<string>(ALL);
   // Default / first saved address label to show in the "DELIVER TO" pill.
   // Falls back to a sensible placeholder if the customer has none yet.
-  const [deliverToLabel, setDeliverToLabel] = useState<string>("Dubai Marina · JLT");
+  const [deliverToLabel, setDeliverToLabel] = useState<string>(
+    isAr ? "دبي مارينا · JLT" : "Dubai Marina · JLT"
+  );
 
   // Refresh the deliver-to label every time the home screen is focused —
   // covers the user adding / setting a default address elsewhere.
@@ -47,14 +60,14 @@ export default function Home() {
       let alive = true;
       (async () => {
         if (!customer?.id) {
-          if (alive) setDeliverToLabel("Dubai Marina · JLT");
+          if (alive) setDeliverToLabel(isAr ? "دبي مارينا · JLT" : "Dubai Marina · JLT");
           return;
         }
         const { data } = await addressesAPI.list();
         if (!alive) return;
         const list = (data || []) as any[];
         if (list.length === 0) {
-          setDeliverToLabel("Dubai Marina · JLT");
+          setDeliverToLabel(isAr ? "دبي مارينا · JLT" : "Dubai Marina · JLT");
           return;
         }
         // Pick default if any, else most recent (already sorted that way by list())
@@ -69,9 +82,9 @@ export default function Home() {
             chosen.address_line.length > 30
               ? chosen.address_line.slice(0, 27) + "…"
               : chosen.address_line;
-          setDeliverToLabel(`${chosen.label || "Home"} · ${short}`);
+          setDeliverToLabel(`${chosen.label || (isAr ? "المنزل" : "Home")} · ${short}`);
         } else {
-          setDeliverToLabel(chosen.label || "Home");
+          setDeliverToLabel(chosen.label || (isAr ? "المنزل" : "Home"));
         }
       })();
       return () => {
@@ -156,7 +169,7 @@ export default function Home() {
 
   // All categories from DB (no slice — show everything the admin has added)
   const displayCategories = useMemo(() => {
-    const arr = [{ key: ALL, label: ALL, emoji: "✨", tint: "#FFF1E5" } as any];
+    const arr = [{ key: ALL, label: isAr ? "الكل" : "All", emoji: "✨", tint: "#FFF1E5" } as any];
     if (liveCategories.length > 0) {
       liveCategories.forEach((c) => {
         const match = STATIC_CATS.find((sc) => sc.label.toLowerCase() === c.name.toLowerCase());
@@ -289,11 +302,11 @@ export default function Home() {
               style={s.addressBtn}
               hitSlop={6}
             >
-              <Text style={s.eyebrow}>DELIVER TO</Text>
+              <Text style={s.eyebrow}>{t("home.deliver_to").toUpperCase()}</Text>
               <View style={s.locationRow}>
                 <Ionicons name="location-sharp" size={14} color="white" />
                 <Text style={s.locationText} numberOfLines={1}>{deliverToLabel}</Text>
-                <Ionicons name="chevron-down" size={14} color="white" style={{ marginLeft: 4, opacity: 0.7 }} />
+                <Ionicons name="chevron-down" size={14} color="white" style={{ marginStart: 4, opacity: 0.7 }} />
               </View>
             </Pressable>
 
@@ -326,13 +339,13 @@ export default function Home() {
 
           <View style={s.trustRow}>
             {[
-              { num: "−70%", lbl: "OFF GROCERIES" },
-              { num: "2h", lbl: "AVG DELIVERY" },
-              { num: "100%", lbl: "VERIFIED STORES" },
-            ].map((t, i) => (
+              { num: "−70%", lbl: isAr ? "خصم على البقالة" : "OFF GROCERIES" },
+              { num: isAr ? "ساعتان" : "2h", lbl: isAr ? "متوسط التوصيل" : "AVG DELIVERY" },
+              { num: "100%", lbl: isAr ? "متاجر موثوقة" : "VERIFIED STORES" },
+            ].map((item, i) => (
               <View key={i} style={s.trustItem}>
-                <Text style={s.trustNum}>{t.num}</Text>
-                <Text style={s.trustLbl}>{t.lbl}</Text>
+                <Text style={s.trustNum}>{item.num}</Text>
+                <Text style={s.trustLbl}>{item.lbl}</Text>
               </View>
             ))}
           </View>
@@ -373,11 +386,15 @@ export default function Home() {
               <Ionicons name="person" size={22} color="#FF6B2C" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={s.signinTitle}>Hey there! 👋</Text>
-              <Text style={s.signinSub}>Sign in for personalised deals & order tracking</Text>
+              <Text style={s.signinTitle}>{isAr ? "مرحباً! 👋" : "Hey there! 👋"}</Text>
+              <Text style={s.signinSub}>
+                {isAr
+                  ? "سجّل دخولك للحصول على عروض مخصصة ومتابعة طلباتك"
+                  : "Sign in for personalised deals & order tracking"}
+              </Text>
             </View>
             <View style={s.signinBtn}>
-              <Text style={s.signinBtnText}>Sign in</Text>
+              <Text style={s.signinBtnText}>{t("auth.sign_in")}</Text>
             </View>
           </Pressable>
         )}
@@ -385,7 +402,8 @@ export default function Home() {
         {user && customer && (
           <View style={s.welcomeBack}>
             <Text style={s.welcomeBackText}>
-              Welcome back, {customer.fullName?.split(" ")[0] || "friend"} 👋
+              {isAr ? "مرحباً بعودتك، " : "Welcome back, "}
+              {customer.fullName?.split(" ")[0] || (isAr ? "صديقنا" : "friend")} 👋
             </Text>
           </View>
         )}
@@ -393,17 +411,19 @@ export default function Home() {
         {loading ? (
           <View style={s.loadingBlock}>
             <ActivityIndicator color="#FF6B2C" size="large" />
-            <Text style={s.loadingText}>Finding fresh deals…</Text>
+            <Text style={s.loadingText}>{isAr ? "نبحث عن عروض جديدة…" : "Finding fresh deals…"}</Text>
           </View>
         ) : filteredProducts.length === 0 ? (
           <View style={s.loadingBlock}>
             <Text style={{ fontSize: 56 }}>🧐</Text>
             <Text style={s.loadingText}>
-              {selectedCat === ALL ? "No deals available right now" : `No ${selectedCat} deals right now`}
+              {selectedCat === ALL
+                ? (isAr ? "لا توجد عروض متاحة حالياً" : "No deals available right now")
+                : (isAr ? `لا توجد عروض في ${selectedCat} حالياً` : `No ${selectedCat} deals right now`)}
             </Text>
             {selectedCat !== ALL && (
               <Pressable onPress={() => setSelectedCat(ALL)} style={s.loadingResetBtn}>
-                <Text style={s.loadingResetText}>Show all deals</Text>
+                <Text style={s.loadingResetText}>{isAr ? "عرض جميع العروض" : "Show all deals"}</Text>
               </Pressable>
             )}
           </View>
@@ -412,8 +432,10 @@ export default function Home() {
             {sections.endingSoon.length > 0 && (
               <>
                 <Section
-                  title={selectedCat === ALL ? "Ending soon 🔥" : `${selectedCat} · Ending soon 🔥`}
-                  sub="Grab these before they're gone"
+                  title={selectedCat === ALL
+                    ? (isAr ? "تنتهي قريباً 🔥" : "Ending soon 🔥")
+                    : (isAr ? `${selectedCat} · تنتهي قريباً 🔥` : `${selectedCat} · Ending soon 🔥`)}
+                  sub={isAr ? "اقتنصها قبل أن تنتهي" : "Grab these before they're gone"}
                   onSeeAll={() => router.push("/(tabs)/deals")}
                 />
                 <HScroll items={sections.endingSoon} />
@@ -421,8 +443,10 @@ export default function Home() {
             )}
 
             <Section
-              title={selectedCat === ALL ? "Top deals near you" : `${selectedCat} · Top deals`}
-              sub="Biggest discounts today"
+              title={selectedCat === ALL
+                ? (isAr ? "أفضل العروض القريبة منك" : "Top deals near you")
+                : (isAr ? `${selectedCat} · أفضل العروض` : `${selectedCat} · Top deals`)}
+              sub={isAr ? "أكبر الخصومات اليوم" : "Biggest discounts today"}
               onSeeAll={() => router.push("/(tabs)/deals")}
             />
             <HScroll items={sections.topDeals.length ? sections.topDeals : filteredProducts.slice(0, 12)} />
@@ -431,8 +455,12 @@ export default function Home() {
               <View style={s.proBanner}>
                 <View style={{ flex: 1 }}>
                   <Text style={s.proBannerTitle}>KafuDeal Pro</Text>
-                  <Text style={s.proBannerSub}>Free delivery + early access to drops</Text>
-                  <Text style={s.proBannerCta}>Try free for 30 days →</Text>
+                  <Text style={s.proBannerSub}>
+                    {isAr ? "توصيل مجاني + وصول مبكر للعروض" : "Free delivery + early access to drops"}
+                  </Text>
+                  <Text style={s.proBannerCta}>
+                    {isAr ? "جرّب مجاناً لمدة 30 يوم ←" : "Try free for 30 days →"}
+                  </Text>
                 </View>
                 <View style={s.proBannerIcon}>
                   <Ionicons name="star" size={24} color="white" />
@@ -450,7 +478,9 @@ export default function Home() {
                   <View key={catName}>
                     <Section
                       title={`${catName} ${emoji}`}
-                      sub={`${list.length} item${list.length === 1 ? "" : "s"}`}
+                      sub={isAr
+                        ? `${list.length} ${list.length === 1 ? "منتج" : "منتجات"}`
+                        : `${list.length} item${list.length === 1 ? "" : "s"}`}
                       onSeeAll={() => {
                         setSelectedCat(catName);
                       }}
@@ -461,8 +491,10 @@ export default function Home() {
               })}
 
             <Section
-              title={selectedCat === ALL ? "All deals" : `All ${selectedCat}`}
-              sub={`${filteredProducts.length} items`}
+              title={selectedCat === ALL
+                ? (isAr ? "جميع العروض" : "All deals")
+                : (isAr ? `جميع ${selectedCat}` : `All ${selectedCat}`)}
+              sub={isAr ? `${filteredProducts.length} منتجات` : `${filteredProducts.length} items`}
               onSeeAll={() => router.push("/(tabs)/deals")}
             />
             <HScroll items={filteredProducts} />
@@ -480,6 +512,8 @@ export default function Home() {
 }
 
 function Section({ title, sub, onSeeAll }: { title: string; sub?: string; onSeeAll?: () => void }) {
+  const { t, i18n } = useTranslation();
+  const isAr = i18n.language === "ar";
   return (
     <View style={s.sectionHead}>
       <View style={{ flex: 1 }}>
@@ -488,7 +522,7 @@ function Section({ title, sub, onSeeAll }: { title: string; sub?: string; onSeeA
       </View>
       {onSeeAll && (
         <Pressable onPress={onSeeAll}>
-          <Text style={s.seeAll}>See all →</Text>
+          <Text style={s.seeAll}>{isAr ? "اعرض الكل ←" : "See all →"}</Text>
         </Pressable>
       )}
     </View>
@@ -555,10 +589,10 @@ const s = StyleSheet.create({
   addressBtn: { alignSelf: "flex-start" },
   eyebrow: { color: "rgba(255,255,255,0.78)", fontSize: 10.5, fontWeight: "700", letterSpacing: 1.6 },
   locationRow: { flexDirection: "row", alignItems: "center", marginTop: 4 },
-  locationText: { color: "white", fontSize: 16, fontWeight: "800", marginLeft: 6, letterSpacing: -0.2 },
+  locationText: { color: "white", fontSize: 16, fontWeight: "800", marginStart: 6, letterSpacing: -0.2 },
   actionsRow: {
     flexDirection: "row", gap: 10, alignItems: "center",
-    marginLeft: "auto",
+    marginStart: "auto",
     // High stack so taps never fall through to the category strip below.
     zIndex: 100, elevation: 100,
   },

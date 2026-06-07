@@ -1,6 +1,7 @@
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { View, Text, Animated, Image } from "react-native";
+import { useTranslation } from "react-i18next";
 import { useCart } from "../../lib/cart-context";
 import { useAuth } from "../../lib/auth-context";
 
@@ -56,6 +57,7 @@ function AccountTabIcon({ color, focused }: { color: string; focused: boolean })
 }
 
 export default function TabsLayout() {
+  const { t } = useTranslation();
   return (
     <Tabs
       screenOptions={{
@@ -76,35 +78,35 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Home",
+          title: t("tab.home"),
           tabBarIcon: ({ color }) => <Ionicons name="home" size={22} color={color} />,
         }}
       />
       <Tabs.Screen
         name="deals"
         options={{
-          title: "Deals",
+          title: t("tab.deals"),
           tabBarIcon: ({ color }) => <Ionicons name="search" size={22} color={color} />,
         }}
       />
       <Tabs.Screen
         name="cart"
         options={{
-          title: "Cart",
+          title: t("tab.cart"),
           tabBarIcon: ({ color }) => <CartTabIcon color={color} />,
         }}
       />
       <Tabs.Screen
         name="orders"
         options={{
-          title: "Orders",
+          title: t("tab.orders"),
           tabBarIcon: ({ color }) => <Ionicons name="receipt-outline" size={22} color={color} />,
         }}
       />
       <Tabs.Screen
         name="account"
         options={{
-          title: "Account",
+          title: t("tab.account"),
           tabBarIcon: ({ color, focused }) => <AccountTabIcon color={color} focused={focused} />,
         }}
       />

@@ -23,8 +23,7 @@ import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import * as Localization from 'expo-localization';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { I18nManager, Platform } from 'react-native';
-import * as Updates from 'expo-updates';
+import { I18nManager } from 'react-native';
 
 import en from '../locales/en.json';
 import ar from '../locales/ar.json';
@@ -70,14 +69,19 @@ export function getCurrentLanguage(): SupportedLanguage {
 }
 
 /**
- * Change the app language. If the RTL/LTR direction changes, we reload the JS
- * bundle so the new layout direction takes effect everywhere.
+ * Change the app language.
  *
- * Caller should show a brief "applying…" indicator and ideally a confirmation
- * dialog before calling this if a reload will happen.
+ * - Strings update immediately (i18n.changeLanguage).
+ * - If RTL/LTR direction changes, we set I18nManager.forceRTL but DO NOT
+ *   call Updates.reloadAsync(). Reloading the JS bundle was occasionally
+ *   wiping the Supabase auth session — safer to ask the user to manually
+ *   close + reopen the app.
+ *
+ * Returns { needsRestart: true } when the layout direction needs to change,
+ * so the caller can show the user a "Close and reopen the app" message.
  */
 export async function setLanguage(lang: SupportedLanguage): Promise<{
-  willReload: boolean;
+  needsRestart: boolean;
 }> {
   await AsyncStorage.setItem(STORAGE_KEY, lang);
   await i18n.changeLanguage(lang);
@@ -88,20 +92,10 @@ export async function setLanguage(lang: SupportedLanguage): Promise<{
   if (directionChanged) {
     I18nManager.allowRTL(true);
     I18nManager.forceRTL(shouldBeRTL);
-
-    // Reload the JS bundle so the new direction takes effect.
-    // In Expo Go / dev, reloadAsync may not be available — fall back gracefully.
-    try {
-      if (Updates.reloadAsync) {
-        await Updates.reloadAsync();
-        return { willReload: true };
-      }
-    } catch (err) {
-      console.warn('[i18n] Could not reload after RTL change:', err);
-    }
+    return { needsRestart: true };
   }
 
-  return { willReload: false };
+  return { needsRestart: false };
 }
 
 /**
