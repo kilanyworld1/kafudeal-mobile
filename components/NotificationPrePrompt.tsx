@@ -23,6 +23,7 @@ import { useEffect, useRef, useState } from "react";
 import { Modal, View, Text, Pressable, StyleSheet, Animated, Easing, Linking, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Notifications from "expo-notifications";
+import { useTranslation } from "react-i18next";
 import {
   hasBeenAsked,
   requestPermission,
@@ -38,6 +39,7 @@ type Props = {
 type Mode = "ask" | "openSettings";
 
 export default function NotificationPrePrompt({ delayMs = 5000 }: Props) {
+  const { t } = useTranslation();
   const { customer } = useAuth();
   const [visible, setVisible] = useState(false);
   const [mode, setMode] = useState<Mode>("ask");
@@ -117,11 +119,11 @@ export default function NotificationPrePrompt({ delayMs = 5000 }: Props) {
 
   if (!visible) return null;
 
-  const acceptLabel = mode === "openSettings" ? "Open Settings" : "Yes, notify me";
+  const acceptLabel = mode === "openSettings" ? t("notif_prompt.open_settings") : t("notif_prompt.accept");
   const bodyText =
     mode === "openSettings"
-      ? `Notifications are turned off for KafuDeal in your ${Platform.OS === "ios" ? "iPhone" : "phone"} settings. Open Settings to allow them so we can keep you updated about your orders.`
-      : "Get notified when your order is confirmed, on its way, and delivered. You can change this anytime in Settings.";
+      ? t("notif_prompt.denied_body")
+      : t("notif_prompt.body");
 
   return (
     <Modal transparent visible animationType="none" onRequestClose={close}>
@@ -131,13 +133,13 @@ export default function NotificationPrePrompt({ delayMs = 5000 }: Props) {
           <View style={s.iconWrap}>
             <Ionicons name="notifications" size={28} color="#FF6B2C" />
           </View>
-          <Text style={s.title}>Stay on top of your orders</Text>
+          <Text style={s.title}>{t("notif_prompt.title")}</Text>
           <Text style={s.body}>{bodyText}</Text>
           <Pressable onPress={accept} style={s.acceptBtn}>
             <Text style={s.acceptText}>{acceptLabel}</Text>
           </Pressable>
           <Pressable onPress={decline} style={s.declineBtn}>
-            <Text style={s.declineText}>Maybe later</Text>
+            <Text style={s.declineText}>{t("notif_prompt.maybe_later")}</Text>
           </Pressable>
         </Animated.View>
       </Animated.View>

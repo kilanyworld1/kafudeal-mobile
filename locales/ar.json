@@ -88,7 +88,13 @@
     "expires_on": "تنتهي صلاحيته في",
     "expiring_soon": "تنتهي قريباً",
     "verified_store": "متجر موثوق",
-    "not_found": "المنتج غير موجود"
+    "not_found": "المنتج غير موجود",
+    "add_to_cart_with_qty": "أضف إلى السلة · {{price}} درهم",
+    "expires_in": "تنتهي خلال {{days}} يوم",
+    "expires_today": "تنتهي اليوم",
+    "verified_seller": "بائع موثوق",
+    "about_product": "عن هذا المنتج",
+    "similar": "عروض مماثلة"
   },
   "cart": {
     "title": "السلة",
@@ -101,7 +107,10 @@
     "checkout": "إتمام الطلب",
     "removed_from_cart": "تمت الإزالة من السلة",
     "empty_sub": "تصفّح العروض وأضف منتجات",
-    "browse_deals": "تصفّح العروض"
+    "browse_deals": "تصفّح العروض",
+    "free": "مجاني",
+    "free_caps": "مجاني",
+    "free_shipping_hint": "أضف {{amount}} درهم للحصول على توصيل مجاني"
   },
   "checkout": {
     "title": "إتمام الطلب",
@@ -109,7 +118,14 @@
     "payment_method": "طريقة الدفع",
     "cash_on_delivery": "الدفع عند الاستلام",
     "place_order": "تأكيد الطلب",
-    "order_placed": "تم تأكيد الطلب!"
+    "order_placed": "تم تأكيد الطلب!",
+    "no_address": "لا يوجد عنوان توصيل",
+    "add_address": "إضافة عنوان",
+    "review_order": "راجع طلبك",
+    "confirm_order": "تأكيد الطلب",
+    "placing_order": "جاري إرسال طلبك...",
+    "order_total": "إجمالي الطلب",
+    "free_delivery": "توصيل مجاني"
   },
   "orders": {
     "title": "الطلبات",
@@ -134,7 +150,21 @@
     "delivered_step": "تم التوصيل",
     "on_the_way_step": "في الطريق",
     "preparing_step": "قيد التحضير",
-    "confirmed_step": "مؤكد"
+    "confirmed_step": "مؤكد",
+    "my_orders_title": "طلباتي",
+    "track_subtitle": "تابع طلباتك وأعد الطلب في أي وقت",
+    "tab_active_count": "نشطة ({{count}})",
+    "tab_past_count": "سابقة ({{count}})",
+    "signed_out_title": "سجّل دخولك لرؤية طلباتك",
+    "signed_out_sub": "سنحفظ سجل طلباتك ونزامنه عبر أجهزتك",
+    "loading": "جاري تحميل طلباتك…",
+    "no_active": "لا توجد طلبات نشطة",
+    "no_active_sub": "ستظهر طلباتك النشطة هنا",
+    "no_past": "لا توجد طلبات سابقة بعد",
+    "no_past_sub": "بعد أول طلب، سيظهر السجل هنا",
+    "order_label": "طلب",
+    "total_label": "الإجمالي",
+    "reorder": "إعادة الطلب"
   },
   "status": {
     "new": "جديد",
@@ -142,7 +172,15 @@
     "preparing": "قيد التحضير",
     "out_for_delivery": "في الطريق",
     "delivered": "تم التوصيل",
-    "cancelled": "ملغي"
+    "cancelled": "ملغي",
+    "pending_caps": "قيد الانتظار",
+    "confirmed_caps": "مؤكد",
+    "preparing_caps": "قيد التحضير",
+    "ready_caps": "جاهز",
+    "on_the_way_caps": "في الطريق",
+    "out_for_delivery_caps": "في الطريق للتوصيل",
+    "delivered_caps": "تم التوصيل",
+    "cancelled_caps": "ملغي"
   },
   "addresses": {
     "title": "العناوين",
@@ -151,7 +189,11 @@
     "default": "افتراضي",
     "no_addresses": "لا توجد عناوين بعد",
     "saved_toast": "تم حفظ العنوان",
-    "deleted_toast": "تم حذف العنوان"
+    "deleted_toast": "تم حذف العنوان",
+    "use_current_location": "استخدم موقعي الحالي",
+    "getting_location": "جاري تحديد موقعك...",
+    "edit": "تعديل",
+    "no_addresses_sub": "أضف عنواناً لتسريع عملية الدفع"
   },
   "account": {
     "title": "الحساب",
@@ -170,7 +212,10 @@
     "follow_ig_sub": "@kafudeal · عروض يومية، من خلف الكواليس",
     "version": "كافوديل v0.13.0 · الإمارات",
     "delete_account": "حذف حسابي",
-    "deleted": "تم حذف الحساب"
+    "deleted": "تم حذف الحساب",
+    "language": "اللغة",
+    "language_english": "English",
+    "language_arabic": "العربية"
   },
   "saved": {
     "title": "العروض المحفوظة",
@@ -190,7 +235,10 @@
     "minutes_ago": "منذ {{count}} دقيقة",
     "hours_ago": "منذ {{count}} ساعة",
     "days_ago": "منذ {{count}} أيام",
-    "mark_all_read": "تمييز الكل كمقروء"
+    "mark_all_read": "تمييز الكل كمقروء",
+    "header_title": "الإشعارات",
+    "empty_title": "لا توجد إشعارات بعد",
+    "track_order": "تتبع الطلب"
   },
   "notif_prompt": {
     "title": "ابقَ على اطلاع بطلباتك",
@@ -233,7 +281,20 @@
   },
   "help": {
     "title": "احصل على المساعدة",
-    "chat_with_us": "تحدث معنا"
+    "subtitle": "كيف يمكننا مساعدتك اليوم؟",
+    "chat_title": "تحدث معنا",
+    "chat_sub": "متوسط الرد خلال 5 دقائق",
+    "call_title": "اتصل بالدعم",
+    "call_sub": "متاح من 9 صباحاً حتى 9 مساءً",
+    "email_title": "الدعم عبر البريد",
+    "email_sub": "support@kafudeal.com",
+    "whatsapp_title": "واتساب",
+    "whatsapp_sub": "دعم سريع عبر الرسائل",
+    "faq_title": "الأسئلة الشائعة",
+    "faq_sub": "أسئلة متكررة",
+    "order_issue": "مشكلة في طلب؟",
+    "order_issue_sub": "ابحث عن طلباتك الأخيرة في تبويب الطلبات",
+    "browse_orders": "تصفّح طلباتي"
   },
   "toast": {
     "something_wrong": "حدث خطأ ما",
@@ -242,7 +303,11 @@
     "saved_success": "تم الحفظ بنجاح",
     "could_not_load": "تعذر التحميل",
     "login_required": "يرجى تسجيل الدخول للمتابعة",
-    "lang_change_failed": "تعذّر تغيير اللغة. حاول مرة أخرى."
+    "lang_change_failed": "تعذّر تغيير اللغة. حاول مرة أخرى.",
+    "address_required": "يرجى اختيار عنوان التوصيل",
+    "cart_empty": "سلتك فارغة",
+    "min_order": "الحد الأدنى للطلب {{amount}} درهم",
+    "order_failed": "تعذّر إرسال الطلب. حاول مرة أخرى."
   },
   "category": {
     "bakery": "المخبوزات",
@@ -253,5 +318,45 @@
     "snacks": "الوجبات الخفيفة",
     "frozen": "المجمدات",
     "personal_care": "العناية الشخصية"
+  },
+  "login": {
+    "title": "سجّل دخولك إلى كافوديل",
+    "subtitle": "احفظ العروض، تابع طلباتك، ولا تفوّت أي عرض",
+    "continue_google": "المتابعة عبر Google",
+    "continue_apple": "المتابعة عبر Apple",
+    "continue_email": "المتابعة بالبريد الإلكتروني",
+    "or": "أو",
+    "terms_pre": "بالمتابعة، فإنك توافق على",
+    "terms": "الشروط",
+    "and": "و",
+    "privacy": "سياسة الخصوصية",
+    "guest_continue": "المتابعة كزائر",
+    "welcome": "مرحباً",
+    "welcome_back": "مرحباً بعودتك!",
+    "signing_in": "جاري تسجيل دخولك..."
+  },
+  "vouchers": {
+    "title": "قسائمي",
+    "subtitle": "العروض النشطة وأكواد الخصم",
+    "empty_title": "لا توجد قسائم بعد",
+    "empty_sub": "سنضيف أكواد الخصم هنا عند توفرها",
+    "active": "نشطة",
+    "used": "مستخدمة",
+    "expired": "منتهية"
+  },
+  "order_detail": {
+    "order_confirmed": "تم تأكيد الطلب",
+    "sent_to_store": "تم إرساله إلى المتجر",
+    "delivered": "تم التوصيل",
+    "on_the_way": "في الطريق",
+    "preparing": "قيد التحضير",
+    "confirmed": "مؤكد",
+    "chat_title": "تحدث مع كافوديل",
+    "chat_sub": "متاح أثناء معالجة طلبك",
+    "items_section": "العناصر",
+    "need_help": "تحتاج مساعدة بخصوص هذا الطلب؟",
+    "placed": "تم الطلب",
+    "delivery_address": "عنوان التوصيل",
+    "payment": "الدفع"
   }
 }

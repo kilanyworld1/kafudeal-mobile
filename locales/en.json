@@ -88,7 +88,13 @@
     "expires_on": "Expires on",
     "expiring_soon": "Expiring soon",
     "verified_store": "VERIFIED STORE",
-    "not_found": "Product not found"
+    "not_found": "Product not found",
+    "add_to_cart_with_qty": "Add to cart · AED {{price}}",
+    "expires_in": "Expires in {{days}}d",
+    "expires_today": "Expires today",
+    "verified_seller": "Verified seller",
+    "about_product": "About this product",
+    "similar": "Similar deals"
   },
   "cart": {
     "title": "Cart",
@@ -101,7 +107,10 @@
     "checkout": "Checkout",
     "removed_from_cart": "Removed from cart",
     "empty_sub": "Browse deals and add some items",
-    "browse_deals": "Browse deals"
+    "browse_deals": "Browse deals",
+    "free": "free",
+    "free_caps": "FREE",
+    "free_shipping_hint": "Add AED {{amount}} more for FREE delivery"
   },
   "checkout": {
     "title": "Checkout",
@@ -109,7 +118,14 @@
     "payment_method": "Payment method",
     "cash_on_delivery": "Cash on delivery",
     "place_order": "Place order",
-    "order_placed": "Order placed!"
+    "order_placed": "Order placed!",
+    "no_address": "No delivery address",
+    "add_address": "Add address",
+    "review_order": "Review your order",
+    "confirm_order": "Confirm order",
+    "placing_order": "Placing your order...",
+    "order_total": "Order total",
+    "free_delivery": "FREE delivery"
   },
   "orders": {
     "title": "Orders",
@@ -134,7 +150,21 @@
     "delivered_step": "Delivered",
     "on_the_way_step": "On the Way",
     "preparing_step": "Preparing",
-    "confirmed_step": "Confirmed"
+    "confirmed_step": "Confirmed",
+    "my_orders_title": "My Orders",
+    "track_subtitle": "Track and reorder anytime",
+    "tab_active_count": "Active ({{count}})",
+    "tab_past_count": "Past ({{count}})",
+    "signed_out_title": "Sign in to see your orders",
+    "signed_out_sub": "We'll keep your order history synced across devices",
+    "loading": "Loading your orders…",
+    "no_active": "No active orders",
+    "no_active_sub": "Your active orders will show here",
+    "no_past": "No past orders yet",
+    "no_past_sub": "Once you order, history will appear here",
+    "order_label": "ORDER",
+    "total_label": "Total",
+    "reorder": "Reorder"
   },
   "status": {
     "new": "New",
@@ -142,7 +172,15 @@
     "preparing": "Preparing",
     "out_for_delivery": "Out for delivery",
     "delivered": "Delivered",
-    "cancelled": "Cancelled"
+    "cancelled": "Cancelled",
+    "pending_caps": "PENDING",
+    "confirmed_caps": "CONFIRMED",
+    "preparing_caps": "PREPARING",
+    "ready_caps": "READY",
+    "on_the_way_caps": "ON THE WAY",
+    "out_for_delivery_caps": "OUT FOR DELIVERY",
+    "delivered_caps": "DELIVERED",
+    "cancelled_caps": "CANCELLED"
   },
   "addresses": {
     "title": "Addresses",
@@ -151,7 +189,11 @@
     "default": "Default",
     "no_addresses": "No addresses yet",
     "saved_toast": "Address saved",
-    "deleted_toast": "Address deleted"
+    "deleted_toast": "Address deleted",
+    "use_current_location": "Use my current location",
+    "getting_location": "Getting your location...",
+    "edit": "Edit",
+    "no_addresses_sub": "Add an address to speed up checkout"
   },
   "account": {
     "title": "Account",
@@ -170,7 +212,10 @@
     "follow_ig_sub": "@kafudeal · Daily drops, behind the scenes",
     "version": "KafuDeal v0.13.0 · UAE",
     "delete_account": "Delete my account",
-    "deleted": "Account deleted"
+    "deleted": "Account deleted",
+    "language": "Language",
+    "language_english": "English",
+    "language_arabic": "العربية"
   },
   "saved": {
     "title": "Saved deals",
@@ -190,7 +235,10 @@
     "minutes_ago": "{{count}}m ago",
     "hours_ago": "{{count}}h ago",
     "days_ago": "{{count}}d ago",
-    "mark_all_read": "Mark all read"
+    "mark_all_read": "Mark all read",
+    "header_title": "Notifications",
+    "empty_title": "No notifications yet",
+    "track_order": "Track order"
   },
   "notif_prompt": {
     "title": "Stay on top of your orders",
@@ -233,7 +281,20 @@
   },
   "help": {
     "title": "Get help",
-    "chat_with_us": "Chat with us"
+    "subtitle": "How can we help you today?",
+    "chat_title": "Chat with us",
+    "chat_sub": "Average reply in 5 minutes",
+    "call_title": "Call support",
+    "call_sub": "Available 9am - 9pm",
+    "email_title": "Email support",
+    "email_sub": "support@kafudeal.com",
+    "whatsapp_title": "WhatsApp",
+    "whatsapp_sub": "Quick text support",
+    "faq_title": "FAQ",
+    "faq_sub": "Common questions",
+    "order_issue": "Issue with an order?",
+    "order_issue_sub": "Find your recent orders in the Orders tab",
+    "browse_orders": "Browse my orders"
   },
   "toast": {
     "something_wrong": "Something went wrong",
@@ -242,7 +303,11 @@
     "saved_success": "Saved successfully",
     "could_not_load": "Could not load",
     "login_required": "Please sign in to continue",
-    "lang_change_failed": "Could not switch language. Try again."
+    "lang_change_failed": "Could not switch language. Try again.",
+    "address_required": "Please select a delivery address",
+    "cart_empty": "Your cart is empty",
+    "min_order": "Minimum order is AED {{amount}}",
+    "order_failed": "Could not place order. Please try again."
   },
   "category": {
     "bakery": "Bakery",
@@ -253,5 +318,45 @@
     "snacks": "Snacks",
     "frozen": "Frozen",
     "personal_care": "Personal care"
+  },
+  "login": {
+    "title": "Sign in to KafuDeal",
+    "subtitle": "Save deals, track orders, and never miss a drop",
+    "continue_google": "Continue with Google",
+    "continue_apple": "Continue with Apple",
+    "continue_email": "Continue with email",
+    "or": "or",
+    "terms_pre": "By continuing, you agree to our",
+    "terms": "Terms",
+    "and": "and",
+    "privacy": "Privacy Policy",
+    "guest_continue": "Continue as guest",
+    "welcome": "Welcome",
+    "welcome_back": "Welcome back!",
+    "signing_in": "Signing you in..."
+  },
+  "vouchers": {
+    "title": "My Vouchers",
+    "subtitle": "Active offers and discount codes",
+    "empty_title": "No vouchers yet",
+    "empty_sub": "We'll add promo codes here when available",
+    "active": "Active",
+    "used": "Used",
+    "expired": "Expired"
+  },
+  "order_detail": {
+    "order_confirmed": "Order confirmed",
+    "sent_to_store": "Sent to the store",
+    "delivered": "Delivered",
+    "on_the_way": "On the Way",
+    "preparing": "Preparing",
+    "confirmed": "Confirmed",
+    "chat_title": "Chat with KafuDeal",
+    "chat_sub": "Available while your order is in progress",
+    "items_section": "Items",
+    "need_help": "Need help with this order?",
+    "placed": "Placed",
+    "delivery_address": "Delivery Address",
+    "payment": "Payment"
   }
 }

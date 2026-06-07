@@ -7,6 +7,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as AppleAuthentication from "expo-apple-authentication";
 import * as WebBrowser from "expo-web-browser";
+import { useTranslation } from "react-i18next";
 import KafuMark from "../components/KafuMark";
 import { useAuth } from "../lib/auth-context";
 
@@ -20,6 +21,7 @@ const EMOJIS = [
 
 export default function Login() {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const { signInWithGoogle, signInWithApple, signInWithFacebook, session } = useAuth();
   const [busy, setBusy] = useState<"google" | "apple" | "facebook" | null>(null);
 
@@ -70,7 +72,7 @@ export default function Login() {
               <KafuMark size={66} variant="color" />
             </View>
             <WelcomeTitle />
-            <Text style={s.sub}>Sign in to track orders and save vouchers</Text>
+            <Text style={s.sub}>{t("login.subtitle")}</Text>
           </View>
 
           {/* Animated emoji stage */}
@@ -99,7 +101,7 @@ export default function Login() {
             ) : (
               <>
                 <GoogleLogo />
-                <Text style={s.socialText}>Continue with Google</Text>
+                <Text style={s.socialText}>{t("login.continue_google")}</Text>
               </>
             )}
           </Pressable>
@@ -128,23 +130,23 @@ export default function Login() {
               <FacebookLogo dark />
               <Text style={s.comingSoonText}>Facebook</Text>
             </View>
-            <Text style={s.comingSoonNote}>Coming soon</Text>
+            <Text style={s.comingSoonNote}>{t("settings.coming_soon")}</Text>
           </View>
 
           <Text style={s.terms}>
-            By continuing you agree to our{"\n"}
+            {t("login.terms_pre")}{"\n"}
             <Text
               style={s.termsLink}
               onPress={() => WebBrowser.openBrowserAsync("https://kafudeal.com/terms.html")}
             >
-              Terms
+              {t("login.terms")}
             </Text>
-            {" and "}
+            {" " + t("login.and") + " "}
             <Text
               style={s.termsLink}
               onPress={() => WebBrowser.openBrowserAsync("https://kafudeal.com/privacy.html")}
             >
-              Privacy Policy
+              {t("login.privacy")}
             </Text>
           </Text>
         </View>
@@ -154,6 +156,7 @@ export default function Login() {
 }
 
 function WelcomeTitle() {
+  const { t } = useTranslation();
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(8)).current;
   useEffect(() => {
@@ -164,7 +167,7 @@ function WelcomeTitle() {
   }, []);
   return (
     <Animated.Text style={[s.welcome, { opacity, transform: [{ translateY }] }]}>
-      Welcome back!
+      {t("login.welcome_back")}
     </Animated.Text>
   );
 }
