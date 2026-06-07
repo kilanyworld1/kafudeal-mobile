@@ -8,15 +8,11 @@
  *
  * - On user change (in Settings):
  *     1. Save preference to AsyncStorage
- *     2. Sync to customers.preferred_language in Supabase (best-effort)
- *     3. If RTL direction changed → call expo-updates.reloadAsync() to apply
- *        the layout flip immediately. (RN's I18nManager.forceRTL only takes
- *        effect on next JS bundle start.)
+ *     2. If RTL direction changed → call expo-updates.reloadAsync() to apply
+ *        the layout flip immediately.
  *
- * Usage in a component:
- *     import { useTranslation } from 'react-i18next';
- *     const { t } = useTranslation();
- *     <Text>{t('common.save')}</Text>
+ * Auth note: Supabase session is persisted in AsyncStorage, so the reload
+ * preserves login state. AuthProvider re-reads the session on init.
  */
 
 import i18n from 'i18next';
@@ -24,6 +20,7 @@ import { initReactI18next } from 'react-i18next';
 import * as Localization from 'expo-localization';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { I18nManager } from 'react-native';
+import * as Updates from 'expo-updates';
 
 import en from '../locales/en.json';
 import ar from '../locales/ar.json';
@@ -46,13 +43,10 @@ function detectDeviceLanguage(): SupportedLanguage {
       if (code === 'ar') return 'ar';
       if (code === 'en') return 'en';
     }
-  } catch {
-    // expo-localization can throw in some sandboxed environments — fall through
-  }
+  } catch {}
   return 'en';
 }
 
-/** Read the user's stored override, if any. Returns null if none set. */
 export async function getStoredLanguage(): Promise<SupportedLanguage | null> {
   try {
     const stored = await AsyncStorage.getItem(STORAGE_KEY);
@@ -63,26 +57,18 @@ export async function getStoredLanguage(): Promise<SupportedLanguage | null> {
   return null;
 }
 
-/** Currently active language. */
 export function getCurrentLanguage(): SupportedLanguage {
   return (i18n.language as SupportedLanguage) || 'en';
 }
 
 /**
  * Change the app language.
- *
- * - Strings update immediately (i18n.changeLanguage).
- * - If RTL/LTR direction changes, we set I18nManager.forceRTL but DO NOT
- *   call Updates.reloadAsync(). Reloading the JS bundle was occasionally
- *   wiping the Supabase auth session — safer to ask the user to manually
- *   close + reopen the app.
- *
- * Returns { needsRestart: true } when the layout direction needs to change,
- * so the caller can show the user a "Close and reopen the app" message.
+ * - If direction changes (LTR↔RTL), trigger a full app reload via
+ *   Updates.reloadAsync() so the new layout takes effect everywhere.
+ * - Supabase auth session is preserved across reload (stored in AsyncStorage,
+ *   re-read by AuthProvider on init).
  */
-export async function setLanguage(lang: SupportedLanguage): Promise<{
-  needsRestart: boolean;
-}> {
+export async function setLanguage(lang: SupportedLanguage): Promise<void> {
   await AsyncStorage.setItem(STORAGE_KEY, lang);
   await i18n.changeLanguage(lang);
 
@@ -92,25 +78,22 @@ export async function setLanguage(lang: SupportedLanguage): Promise<{
   if (directionChanged) {
     I18nManager.allowRTL(true);
     I18nManager.forceRTL(shouldBeRTL);
-    return { needsRestart: true };
+    // Small delay so the AsyncStorage write completes before reload.
+    await new Promise((r) => setTimeout(r, 300));
+    try {
+      await Updates.reloadAsync();
+    } catch (err) {
+      console.warn('[i18n] reloadAsync failed (dev mode?):', err);
+    }
   }
-
-  return { needsRestart: false };
 }
 
-/**
- * Initialize i18n before the first render. Call this at the very top of the
- * root layout, BEFORE returning any JSX.
- */
 export async function initI18n(): Promise<void> {
   if (i18n.isInitialized) return;
 
   const stored = await getStoredLanguage();
   const language: SupportedLanguage = stored || detectDeviceLanguage();
 
-  // Set RTL state before first render. If the saved language disagrees with
-  // the current I18nManager state, the user will see a one-time flip on next
-  // app launch — acceptable for first install.
   I18nManager.allowRTL(true);
   if (isRTL(language) !== I18nManager.isRTL) {
     I18nManager.forceRTL(isRTL(language));
@@ -126,9 +109,7 @@ export async function initI18n(): Promise<void> {
       },
       lng: language,
       fallbackLng: 'en',
-      interpolation: {
-        escapeValue: false, // React already escapes
-      },
+      interpolation: { escapeValue: false },
       returnNull: false,
     });
 }

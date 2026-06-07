@@ -52,24 +52,12 @@ export default function Settings() {
     if (lang === currentLang) return;
     setSwitchingLang(true);
     try {
-      const { needsRestart } = await setLanguage(lang);
-      if (needsRestart) {
-        // Layout direction needs to flip — tell user to manually restart.
-        // We DON'T auto-reload because Updates.reloadAsync() was wiping
-        // the Supabase auth session.
-        Alert.alert(
-          lang === "ar" ? "تم تغيير اللغة" : "Language changed",
-          lang === "ar"
-            ? "يرجى إغلاق التطبيق وفتحه مرة أخرى لتطبيق التخطيط من اليمين إلى اليسار."
-            : "Please close the app and reopen it to apply the layout direction.",
-          [{ text: lang === "ar" ? "موافق" : "OK" }]
-        );
-      }
-      // If !needsRestart, strings already updated everywhere via the hook.
+      // Triggers Updates.reloadAsync() if direction changes — app
+      // restarts automatically, no user action needed.
+      await setLanguage(lang);
     } catch (e) {
       console.warn("Language change failed:", e);
       Alert.alert("Error", "Could not switch language. Try again.");
-    } finally {
       setSwitchingLang(false);
     }
   };

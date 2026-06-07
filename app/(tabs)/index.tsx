@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import {
   View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator,
-  Animated, Image, RefreshControl, I18nManager,
+  Animated, RefreshControl, I18nManager,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
@@ -18,28 +18,11 @@ import ProductCard from "../../components/ProductCard";
 import HeaderIconButton from "../../components/HeaderIconButton";
 import NotificationPrePrompt from "../../components/NotificationPrePrompt";
 
-const PHRASES_EN = [
-  "Try 'chocolate'",
-  "Try 'sourdough'",
-  "Try 'milk 2L'",
-  "Try 'iftar deals'",
-  "Try 'strawberries'",
-];
-const PHRASES_AR = [
-  "جرّب 'شوكولاتة'",
-  "جرّب 'خبز'",
-  "جرّب 'حليب 2 لتر'",
-  "جرّب 'عروض الإفطار'",
-  "جرّب 'فراولة'",
-];
-
 const ALL = "All";
 
 export default function Home() {
   const insets = useSafeAreaInsets();
-  const { t, i18n } = useTranslation();
-  const isAr = i18n.language === "ar";
-  const PHRASES = isAr ? PHRASES_AR : PHRASES_EN;
+  const { t } = useTranslation();
   const { user, customer } = useAuth();
   const { unreadCount } = useNotifications();
   const [placeholder, setPlaceholder] = useState("");
@@ -47,53 +30,55 @@ export default function Home() {
   const [liveCategories, setLiveCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCat, setSelectedCat] = useState<string>(ALL);
-  // Default / first saved address label to show in the "DELIVER TO" pill.
-  // Falls back to a sensible placeholder if the customer has none yet.
-  const [deliverToLabel, setDeliverToLabel] = useState<string>(
-    isAr ? "دبي مارينا · JLT" : "Dubai Marina · JLT"
+  const [deliverToLabel, setDeliverToLabel] = useState<string>(t("home.address_fallback"));
+
+  // Search placeholder phrases (rotate through them in typewriter effect)
+  const PHRASES = useMemo(
+    () => [
+      t("home.search_placeholder_1"),
+      t("home.search_placeholder_2"),
+      t("home.search_placeholder_3"),
+      t("home.search_placeholder_4"),
+      t("home.search_placeholder_5"),
+    ],
+    [t]
   );
 
-  // Refresh the deliver-to label every time the home screen is focused —
-  // covers the user adding / setting a default address elsewhere.
   useFocusEffect(
     useCallback(() => {
       let alive = true;
       (async () => {
         if (!customer?.id) {
-          if (alive) setDeliverToLabel(isAr ? "دبي مارينا · JLT" : "Dubai Marina · JLT");
+          if (alive) setDeliverToLabel(t("home.address_fallback"));
           return;
         }
         const { data } = await addressesAPI.list();
         if (!alive) return;
         const list = (data || []) as any[];
         if (list.length === 0) {
-          setDeliverToLabel(isAr ? "دبي مارينا · JLT" : "Dubai Marina · JLT");
+          setDeliverToLabel(t("home.address_fallback"));
           return;
         }
-        // Pick default if any, else most recent (already sorted that way by list())
         const chosen = list.find((a) => a.is_default) || list[0];
-        // Show city · emirate when available, otherwise label · address_line tail
         const cityEmirate = [chosen.city, chosen.emirate].filter(Boolean).join(", ");
         if (cityEmirate) {
           setDeliverToLabel(cityEmirate);
         } else if (chosen.address_line) {
-          // Trim long address_line so it doesn't overflow the banner
           const short =
             chosen.address_line.length > 30
               ? chosen.address_line.slice(0, 27) + "…"
               : chosen.address_line;
-          setDeliverToLabel(`${chosen.label || (isAr ? "المنزل" : "Home")} · ${short}`);
+          setDeliverToLabel(`${chosen.label || t("home.address_home")} · ${short}`);
         } else {
-          setDeliverToLabel(chosen.label || (isAr ? "المنزل" : "Home"));
+          setDeliverToLabel(chosen.label || t("home.address_home"));
         }
       })();
       return () => {
         alive = false;
       };
-    }, [customer?.id])
+    }, [customer?.id, t])
   );
 
-  // Sticky header animation
   const scrollY = useRef(new Animated.Value(0)).current;
   const STICKY_THRESHOLD = 220;
 
@@ -103,6 +88,7 @@ export default function Home() {
     let timer: any;
     const tick = () => {
       const word = PHRASES[pi];
+      if (!word) return;
       if (!deleting) {
         ci++;
         setPlaceholder(word.slice(0, ci));
@@ -116,7 +102,7 @@ export default function Home() {
     };
     tick();
     return () => clearTimeout(timer);
-  }, []);
+  }, [PHRASES]);
 
   const [refreshing, setRefreshing] = useState(false);
 
@@ -129,7 +115,6 @@ export default function Home() {
     setLiveCategories((cats || []).map(transformCategory));
   }, []);
 
-  // Initial fetch
   useEffect(() => {
     (async () => {
       setLoading(true);
@@ -138,7 +123,6 @@ export default function Home() {
     })();
   }, [fetchAll]);
 
-  // Refetch on focus but throttled — skip if we fetched < 10s ago
   const lastFetchRef = useRef(0);
   useFocusEffect(
     useCallback(() => {
@@ -154,7 +138,6 @@ export default function Home() {
     setRefreshing(false);
   }, [fetchAll]);
 
-  // Filter by selected category
   const filteredProducts = useMemo(() => {
     if (selectedCat === ALL) return products;
     return products.filter((p) => p.category.toLowerCase() === selectedCat.toLowerCase());
@@ -167,9 +150,8 @@ export default function Home() {
     return { endingSoon, topDeals };
   }, [filteredProducts]);
 
-  // All categories from DB (no slice — show everything the admin has added)
   const displayCategories = useMemo(() => {
-    const arr = [{ key: ALL, label: isAr ? "الكل" : "All", emoji: "✨", tint: "#FFF1E5" } as any];
+    const arr = [{ key: ALL, label: t("home.category_all"), emoji: "✨", tint: "#FFF1E5" } as any];
     if (liveCategories.length > 0) {
       liveCategories.forEach((c) => {
         const match = STATIC_CATS.find((sc) => sc.label.toLowerCase() === c.name.toLowerCase());
@@ -184,9 +166,8 @@ export default function Home() {
       STATIC_CATS.forEach((c) => arr.push({ key: c.label, label: c.label, emoji: c.emoji, tint: c.tint }));
     }
     return arr;
-  }, [liveCategories]);
+  }, [liveCategories, t]);
 
-  // Group products by category — for the dynamic per-category sections in the body
   const productsByCategory = useMemo(() => {
     const map = new Map<string, Product[]>();
     for (const p of products) {
@@ -197,12 +178,6 @@ export default function Home() {
     return map;
   }, [products]);
 
-  const avatarUrl =
-    (user?.user_metadata?.avatar_url as string) ||
-    (user?.user_metadata?.picture as string) ||
-    "";
-
-  // Sticky header interpolations
   const stickyOpacity = scrollY.interpolate({
     inputRange: [STICKY_THRESHOLD - 40, STICKY_THRESHOLD],
     outputRange: [0, 1],
@@ -216,7 +191,7 @@ export default function Home() {
 
   return (
     <View style={s.root}>
-      {/* Sticky mini-header (appears on scroll) */}
+      {/* Sticky mini-header */}
       <Animated.View
         pointerEvents="box-none"
         style={[
@@ -254,7 +229,6 @@ export default function Home() {
           </View>
         </View>
 
-        {/* Tiny inline category chips */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -339,9 +313,9 @@ export default function Home() {
 
           <View style={s.trustRow}>
             {[
-              { num: "−70%", lbl: isAr ? "خصم على البقالة" : "OFF GROCERIES" },
-              { num: isAr ? "ساعتان" : "2h", lbl: isAr ? "متوسط التوصيل" : "AVG DELIVERY" },
-              { num: "100%", lbl: isAr ? "متاجر موثوقة" : "VERIFIED STORES" },
+              { num: "−70%", lbl: t("home.trust_off_groceries") },
+              { num: t("home.trust_2h"), lbl: t("home.trust_avg_delivery") },
+              { num: "100%", lbl: t("home.trust_verified_stores") },
             ].map((item, i) => (
               <View key={i} style={s.trustItem}>
                 <Text style={s.trustNum}>{item.num}</Text>
@@ -379,19 +353,14 @@ export default function Home() {
           })}
         </ScrollView>
 
-        {/* Sign-in pill */}
         {!user && (
           <Pressable onPress={() => router.push("/login")} style={s.signinCard}>
             <View style={s.signinIcon}>
               <Ionicons name="person" size={22} color="#FF6B2C" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={s.signinTitle}>{isAr ? "مرحباً! 👋" : "Hey there! 👋"}</Text>
-              <Text style={s.signinSub}>
-                {isAr
-                  ? "سجّل دخولك للحصول على عروض مخصصة ومتابعة طلباتك"
-                  : "Sign in for personalised deals & order tracking"}
-              </Text>
+              <Text style={s.signinTitle}>{t("home.guest_greeting")}</Text>
+              <Text style={s.signinSub}>{t("home.guest_sub")}</Text>
             </View>
             <View style={s.signinBtn}>
               <Text style={s.signinBtnText}>{t("auth.sign_in")}</Text>
@@ -402,8 +371,8 @@ export default function Home() {
         {user && customer && (
           <View style={s.welcomeBack}>
             <Text style={s.welcomeBackText}>
-              {isAr ? "مرحباً بعودتك، " : "Welcome back, "}
-              {customer.fullName?.split(" ")[0] || (isAr ? "صديقنا" : "friend")} 👋
+              {t("home.welcome_back_prefix")}
+              {customer.fullName?.split(" ")[0] || t("home.friend")} 👋
             </Text>
           </View>
         )}
@@ -411,19 +380,19 @@ export default function Home() {
         {loading ? (
           <View style={s.loadingBlock}>
             <ActivityIndicator color="#FF6B2C" size="large" />
-            <Text style={s.loadingText}>{isAr ? "نبحث عن عروض جديدة…" : "Finding fresh deals…"}</Text>
+            <Text style={s.loadingText}>{t("home.finding_deals")}</Text>
           </View>
         ) : filteredProducts.length === 0 ? (
           <View style={s.loadingBlock}>
             <Text style={{ fontSize: 56 }}>🧐</Text>
             <Text style={s.loadingText}>
               {selectedCat === ALL
-                ? (isAr ? "لا توجد عروض متاحة حالياً" : "No deals available right now")
-                : (isAr ? `لا توجد عروض في ${selectedCat} حالياً` : `No ${selectedCat} deals right now`)}
+                ? t("home.no_deals")
+                : t("home.no_cat_deals", { cat: selectedCat })}
             </Text>
             {selectedCat !== ALL && (
               <Pressable onPress={() => setSelectedCat(ALL)} style={s.loadingResetBtn}>
-                <Text style={s.loadingResetText}>{isAr ? "عرض جميع العروض" : "Show all deals"}</Text>
+                <Text style={s.loadingResetText}>{t("home.show_all_deals")}</Text>
               </Pressable>
             )}
           </View>
@@ -433,9 +402,9 @@ export default function Home() {
               <>
                 <Section
                   title={selectedCat === ALL
-                    ? (isAr ? "تنتهي قريباً 🔥" : "Ending soon 🔥")
-                    : (isAr ? `${selectedCat} · تنتهي قريباً 🔥` : `${selectedCat} · Ending soon 🔥`)}
-                  sub={isAr ? "اقتنصها قبل أن تنتهي" : "Grab these before they're gone"}
+                    ? t("home.ending_soon")
+                    : t("home.ending_soon_with_cat", { cat: selectedCat })}
+                  sub={t("home.grab_them")}
                   onSeeAll={() => router.push("/(tabs)/deals")}
                 />
                 <HScroll items={sections.endingSoon} />
@@ -444,9 +413,9 @@ export default function Home() {
 
             <Section
               title={selectedCat === ALL
-                ? (isAr ? "أفضل العروض القريبة منك" : "Top deals near you")
-                : (isAr ? `${selectedCat} · أفضل العروض` : `${selectedCat} · Top deals`)}
-              sub={isAr ? "أكبر الخصومات اليوم" : "Biggest discounts today"}
+                ? t("home.top_deals_near")
+                : t("home.top_deals_with_cat", { cat: selectedCat })}
+              sub={t("home.biggest_discounts")}
               onSeeAll={() => router.push("/(tabs)/deals")}
             />
             <HScroll items={sections.topDeals.length ? sections.topDeals : filteredProducts.slice(0, 12)} />
@@ -455,12 +424,8 @@ export default function Home() {
               <View style={s.proBanner}>
                 <View style={{ flex: 1 }}>
                   <Text style={s.proBannerTitle}>KafuDeal Pro</Text>
-                  <Text style={s.proBannerSub}>
-                    {isAr ? "توصيل مجاني + وصول مبكر للعروض" : "Free delivery + early access to drops"}
-                  </Text>
-                  <Text style={s.proBannerCta}>
-                    {isAr ? "جرّب مجاناً لمدة 30 يوم ←" : "Try free for 30 days →"}
-                  </Text>
+                  <Text style={s.proBannerSub}>{t("home.pro_sub")}</Text>
+                  <Text style={s.proBannerCta}>{t("home.pro_cta")}</Text>
                 </View>
                 <View style={s.proBannerIcon}>
                   <Ionicons name="star" size={24} color="white" />
@@ -468,7 +433,6 @@ export default function Home() {
               </View>
             )}
 
-            {/* When viewing ALL, render one section per category (web parity) */}
             {selectedCat === ALL &&
               Array.from(productsByCategory.entries()).map(([catName, list]) => {
                 if (list.length === 0) return null;
@@ -478,9 +442,9 @@ export default function Home() {
                   <View key={catName}>
                     <Section
                       title={`${catName} ${emoji}`}
-                      sub={isAr
-                        ? `${list.length} ${list.length === 1 ? "منتج" : "منتجات"}`
-                        : `${list.length} item${list.length === 1 ? "" : "s"}`}
+                      sub={list.length === 1
+                        ? t("home.items_count_one")
+                        : t("home.items_count", { count: list.length })}
                       onSeeAll={() => {
                         setSelectedCat(catName);
                       }}
@@ -492,9 +456,9 @@ export default function Home() {
 
             <Section
               title={selectedCat === ALL
-                ? (isAr ? "جميع العروض" : "All deals")
-                : (isAr ? `جميع ${selectedCat}` : `All ${selectedCat}`)}
-              sub={isAr ? `${filteredProducts.length} منتجات` : `${filteredProducts.length} items`}
+                ? t("home.all_deals")
+                : t("home.all_with_cat", { cat: selectedCat })}
+              sub={t("home.items_count", { count: filteredProducts.length })}
               onSeeAll={() => router.push("/(tabs)/deals")}
             />
             <HScroll items={filteredProducts} />
@@ -502,18 +466,13 @@ export default function Home() {
         )}
       </Animated.ScrollView>
 
-      {/* Friendly pre-prompt for notification permission. Shows ~5s after
-          the user signs in & lands on home, and only if we've never asked.
-          The modal itself decides whether to render based on the user's
-          current permission status, so it's safe to leave mounted here. */}
       <NotificationPrePrompt delayMs={5000} />
     </View>
   );
 }
 
 function Section({ title, sub, onSeeAll }: { title: string; sub?: string; onSeeAll?: () => void }) {
-  const { t, i18n } = useTranslation();
-  const isAr = i18n.language === "ar";
+  const { t } = useTranslation();
   return (
     <View style={s.sectionHead}>
       <View style={{ flex: 1 }}>
@@ -522,7 +481,7 @@ function Section({ title, sub, onSeeAll }: { title: string; sub?: string; onSeeA
       </View>
       {onSeeAll && (
         <Pressable onPress={onSeeAll}>
-          <Text style={s.seeAll}>{isAr ? "اعرض الكل ←" : "See all →"}</Text>
+          <Text style={s.seeAll}>{t("common.see_all_arrow")}</Text>
         </Pressable>
       )}
     </View>
@@ -560,17 +519,6 @@ const s = StyleSheet.create({
   },
   stickyLoc: { flexDirection: "row", alignItems: "center", gap: 5 },
   stickyLocText: { fontSize: 13, fontWeight: "800", color: "#0F172A" },
-  stickyIconBtn: {
-    width: 34, height: 34, borderRadius: 17,
-    backgroundColor: "#F1EFE8",
-    alignItems: "center", justifyContent: "center",
-  },
-  stickyDot: {
-    position: "absolute", top: 6, right: 7, width: 8, height: 8,
-    borderRadius: 4, backgroundColor: "#FF6B2C",
-    borderWidth: 2, borderColor: "white",
-  },
-  stickyAvatar: { width: 34, height: 34, borderRadius: 17, backgroundColor: "#F1EFE8" },
   miniChip: {
     flexDirection: "row", alignItems: "center", gap: 5,
     paddingHorizontal: 11, paddingVertical: 6, borderRadius: 999,
@@ -585,7 +533,6 @@ const s = StyleSheet.create({
     borderBottomLeftRadius: 26, borderBottomRightRadius: 26,
   },
   topRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
-  // Limit the address Pressable to its own content so it can't steal taps from the icons to its right.
   addressBtn: { alignSelf: "flex-start" },
   eyebrow: { color: "rgba(255,255,255,0.78)", fontSize: 10.5, fontWeight: "700", letterSpacing: 1.6 },
   locationRow: { flexDirection: "row", alignItems: "center", marginTop: 4 },
@@ -593,23 +540,7 @@ const s = StyleSheet.create({
   actionsRow: {
     flexDirection: "row", gap: 10, alignItems: "center",
     marginStart: "auto",
-    // High stack so taps never fall through to the category strip below.
     zIndex: 100, elevation: 100,
-  },
-  iconBtn: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.20)",
-    borderWidth: 1, borderColor: "rgba(255,255,255,0.30)",
-    alignItems: "center", justifyContent: "center",
-  },
-  iconDot: {
-    position: "absolute", top: 8, right: 9, width: 9, height: 9,
-    borderRadius: 4.5, backgroundColor: "#FFC857",
-    borderWidth: 2, borderColor: "#FF8C3A",
-  },
-  headerAvatar: {
-    width: 40, height: 40, borderRadius: 20,
-    borderWidth: 2, borderColor: "rgba(255,255,255,0.6)",
   },
   search: {
     marginTop: 18, backgroundColor: "white", borderRadius: 14,
