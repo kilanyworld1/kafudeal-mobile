@@ -333,10 +333,10 @@ function Row({
       ) : value2 ? (
         <>
           <Text style={s.rowValue}>{value2}</Text>
-          <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+          <Ionicons name="chevron-forward" size={16} color="#94A3B8" style={I18nManager.isRTL ? { transform: [{ scaleX: -1 }] } : undefined} />
         </>
       ) : (
-        <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+        <Ionicons name="chevron-forward" size={16} color="#94A3B8" style={I18nManager.isRTL ? { transform: [{ scaleX: -1 }] } : undefined} />
       )}
     </Pressable>
   );

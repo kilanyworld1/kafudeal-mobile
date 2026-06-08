@@ -1,67 +1,70 @@
 import { useState } from "react";
-import { View, Text, ScrollView, Pressable, TextInput, StyleSheet } from "react-native";
+import { View, Text, ScrollView, Pressable, TextInput, StyleSheet, I18nManager } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
-
-const vouchers = [
-  {
-    id: "v1", code: "KAFU10",
-    title: "10 AED off your next order",
-    sub: "Min spend AED 50 · Expires in 5 days",
-    color: "#FF6B2C", tag: "ACTIVE", tagColor: "#16A34A",
-  },
-  {
-    id: "v2", code: "FRESH20",
-    title: "20% off Fresh & Dairy",
-    sub: "Min spend AED 30 · Expires Jun 1",
-    color: "#16A34A", tag: "ACTIVE", tagColor: "#16A34A",
-  },
-  {
-    id: "v3", code: "WELCOME15",
-    title: "AED 15 off first order",
-    sub: "Used on 12 May 2026",
-    color: "#94A3B8", tag: "USED", tagColor: "#94A3B8", used: true,
-  },
-];
+import { useTranslation } from "react-i18next";
 
 export default function Vouchers() {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const [code, setCode] = useState("");
   const [copied, setCopied] = useState<string | null>(null);
+
+  const vouchers = [
+    {
+      id: "v1", code: "KAFU10",
+      title: t("vouchers.v1_title"),
+      sub: t("vouchers.v1_sub"),
+      color: "#FF6B2C", tag: t("vouchers.status_active"), tagColor: "#16A34A",
+    },
+    {
+      id: "v2", code: "FRESH20",
+      title: t("vouchers.v2_title"),
+      sub: t("vouchers.v2_sub"),
+      color: "#16A34A", tag: t("vouchers.status_active"), tagColor: "#16A34A",
+    },
+    {
+      id: "v3", code: "WELCOME15",
+      title: t("vouchers.v3_title"),
+      sub: t("vouchers.v3_sub"),
+      color: "#94A3B8", tag: t("vouchers.status_used"), tagColor: "#94A3B8", used: true,
+    },
+  ];
 
   const copy = (c: string) => {
     setCopied(c);
     setTimeout(() => setCopied(null), 1500);
   };
 
+  const backStyle = I18nManager.isRTL ? { transform: [{ scaleX: -1 }] as any } : undefined;
+
   return (
     <View style={s.root}>
       <View style={[s.topBar, { paddingTop: insets.top + 8 }]}>
         <Pressable onPress={() => router.back()} style={s.iconBtn}>
-          <Ionicons name="chevron-back" size={24} color="#0F172A" />
+          <Ionicons name="chevron-back" size={24} color="#0F172A" style={backStyle} />
         </Pressable>
-        <Text style={s.topTitle}>Vouchers</Text>
+        <Text style={s.topTitle}>{t("vouchers.title_caps")}</Text>
         <View style={{ width: 36 }} />
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
-        {/* Redeem code */}
-        <Text style={s.section}>REDEEM A CODE</Text>
+        <Text style={s.section}>{t("vouchers.redeem_a_code")}</Text>
         <View style={s.redeemRow}>
           <TextInput
             value={code} onChangeText={setCode}
-            placeholder="Enter voucher code"
+            placeholder={t("vouchers.enter_placeholder")}
             placeholderTextColor="#94A3B8"
             autoCapitalize="characters"
             style={s.redeemInput}
           />
           <Pressable style={s.redeemBtn}>
-            <Text style={s.redeemBtnText}>Redeem</Text>
+            <Text style={s.redeemBtnText}>{t("vouchers.redeem_btn")}</Text>
           </Pressable>
         </View>
 
-        <Text style={[s.section, { marginTop: 24 }]}>YOUR VOUCHERS</Text>
+        <Text style={[s.section, { marginTop: 24 }]}>{t("vouchers.your_vouchers")}</Text>
 
         {vouchers.map((v) => (
           <View key={v.id} style={[s.voucher, v.used && { opacity: 0.6 }]}>
@@ -85,7 +88,7 @@ export default function Vouchers() {
               {!v.used && (
                 <Pressable onPress={() => copy(v.code)} style={s.copyBtn}>
                   <Ionicons name={copied === v.code ? "checkmark" : "copy-outline"} size={14} color="#FF6B2C" />
-                  <Text style={s.copyText}>{copied === v.code ? "Copied!" : "Copy code"}</Text>
+                  <Text style={s.copyText}>{copied === v.code ? t("vouchers.copied") : t("vouchers.copy_code")}</Text>
                 </Pressable>
               )}
             </View>
@@ -94,9 +97,7 @@ export default function Vouchers() {
 
         <View style={s.infoCard}>
           <Ionicons name="information-circle-outline" size={20} color="#1D4ED8" />
-          <Text style={s.infoText}>
-            Apply vouchers at checkout. One voucher per order.
-          </Text>
+          <Text style={s.infoText}>{t("vouchers.apply_at_checkout")}</Text>
         </View>
       </ScrollView>
     </View>

@@ -1,21 +1,13 @@
 import { useCallback, useState } from "react";
-import { View, Text, ScrollView, Pressable, StyleSheet, Image, ActivityIndicator, Alert } from "react-native";
+import { View, Text, ScrollView, Pressable, StyleSheet, Image, ActivityIndicator, Alert, I18nManager } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useFocusEffect } from "expo-router";
+import { useTranslation } from "react-i18next";
 import { useCart } from "../lib/cart-context";
 import { useAuth } from "../lib/auth-context";
 import { ordersAPI, addressesAPI } from "../lib/api";
 import { getPermissionStatus, hasBeenAsked, requestPermission, registerDeviceForCustomer } from "../lib/push";
-
-// Payment options. These are display-only for now — the real payment integration
-// (Stripe, Tap, etc.) is a v12 task. We just store the chosen label on the order
-// so the dashboard knows what the customer picked.
-const payments = [
-  { id: "p1", label: "Visa ending in 4242", icon: "card-outline" as const },
-  { id: "p2", label: "Cash on Delivery", icon: "cash-outline" as const },
-  { id: "p3", label: "Apple Pay", icon: "logo-apple" as const },
-];
 
 type Address = {
   id: string;
@@ -29,8 +21,18 @@ type Address = {
 
 export default function Checkout() {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const { items, subtotal, clear, showToast } = useCart();
   const { customer, session, refreshProfile } = useAuth();
+
+  // Payment options. These are display-only for now — the real payment integration
+  // (Stripe, Tap, etc.) is a v12 task. We just store the chosen label on the order
+  // so the dashboard knows what the customer picked.
+  const payments = [
+    { id: "p1", label: t("checkout.card_option"), icon: "card-outline" as const },
+    { id: "p2", label: t("checkout.cash_option"), icon: "cash-outline" as const },
+    { id: "p3", label: t("checkout.apple_pay_option"), icon: "logo-apple" as const },
+  ];
 
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [loadingAddresses, setLoadingAddresses] = useState(true);
@@ -88,12 +90,12 @@ export default function Checkout() {
       }
 
       Alert.alert(
-        "Sign in to place an order",
-        "We'll save your cart and let you track the order. It only takes a few seconds.",
+        t("checkout.signin_required_title"),
+        t("checkout.signin_required_sub"),
         [
-          { text: "Cancel", style: "cancel" },
+          { text: t("common.cancel"), style: "cancel" },
           {
-            text: "Sign in",
+            text: t("auth.sign_in"),
             onPress: () => router.push("/login"),
           },
         ]
@@ -106,11 +108,11 @@ export default function Checkout() {
     const selectedAddress = addresses.find((a) => a.id === addrId);
     if (!selectedAddress) {
       Alert.alert(
-        "Choose a delivery address",
-        "Add a delivery address so we know where to send your order.",
+        t("checkout.choose_address_title"),
+        t("checkout.choose_address_sub"),
         [
-          { text: "Cancel", style: "cancel" },
-          { text: "Add address", onPress: () => router.push("/add-address") },
+          { text: t("common.cancel"), style: "cancel" },
+          { text: t("checkout.add_address_btn"), onPress: () => router.push("/add-address") },
         ]
       );
       return;
@@ -127,14 +129,14 @@ export default function Checkout() {
       const msg =
         typeof error === "string"
           ? error
-          : (error as any)?.message || (error as any)?.details || "Please try again.";
-      Alert.alert("Couldn't place order", msg);
+          : (error as any)?.message || (error as any)?.details || t("toast.try_again");
+      Alert.alert(t("checkout.couldnt_place_title"), msg);
       console.warn("createOrder failed:", error);
       return;
     }
 
     clear();
-    showToast({ message: "Order confirmed!", kind: "cart" });
+    showToast({ message: t("checkout.order_confirmed_toast"), kind: "cart" });
 
     // Second-chance notification prompt: only if the user previously
     // declined or hasn't been asked yet AND status is still undetermined.
@@ -144,12 +146,12 @@ export default function Checkout() {
       const status = await getPermissionStatus();
       if (status === "undetermined") {
         Alert.alert(
-          "Get order updates?",
-          "Want a notification when your order is on the way and when it arrives?",
+          t("checkout.get_updates_title"),
+          t("checkout.get_updates_sub"),
           [
-            { text: "Not now", style: "cancel" },
+            { text: t("checkout.not_now"), style: "cancel" },
             {
-              text: "Yes, notify me",
+              text: t("notif_prompt.accept"),
               onPress: async () => {
                 const next = await requestPermission();
                 if (next === "granted" && customer?.id) {
@@ -168,22 +170,24 @@ export default function Checkout() {
     router.replace(`/order/${data.id}`);
   };
 
+  const backIconStyle = I18nManager.isRTL ? { transform: [{ scaleX: -1 }] as any } : undefined;
+
   return (
     <View style={s.root}>
       <View style={[s.topBar, { paddingTop: insets.top + 8 }]}>
         <Pressable onPress={() => router.back()} style={s.backBtn}>
-          <Ionicons name="chevron-back" size={24} color="#0F172A" />
+          <Ionicons name="chevron-back" size={24} color="#0F172A" style={backIconStyle} />
         </Pressable>
-        <Text style={s.topTitle}>Checkout</Text>
+        <Text style={s.topTitle}>{t("checkout.title")}</Text>
         <View style={{ width: 36 }} />
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 140 }}>
         {/* Address */}
         <View style={s.sectionRow}>
-          <Text style={s.sectionTitle}>Delivery address</Text>
+          <Text style={s.sectionTitle}>{t("checkout.delivery_address")}</Text>
           <Pressable onPress={() => router.push("/addresses")}>
-            <Text style={s.sectionLink}>Manage</Text>
+            <Text style={s.sectionLink}>{t("checkout.manage")}</Text>
           </Pressable>
         </View>
 
@@ -195,10 +199,10 @@ export default function Checkout() {
           <Pressable onPress={() => router.push("/add-address")} style={s.emptyCard}>
             <Ionicons name="location-outline" size={22} color="#FF6B2C" />
             <View style={{ flex: 1 }}>
-              <Text style={s.emptyTitle}>No saved addresses yet</Text>
-              <Text style={s.emptySub}>Add an address so we can deliver your order.</Text>
+              <Text style={s.emptyTitle}>{t("checkout.no_addresses")}</Text>
+              <Text style={s.emptySub}>{t("checkout.no_addresses_sub")}</Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color="#FF6B2C" />
+            <Ionicons name="chevron-forward" size={20} color="#FF6B2C" style={backIconStyle} />
           </Pressable>
         ) : (
           addresses.map((a) => {
@@ -218,7 +222,7 @@ export default function Checkout() {
                       <Text style={s.cardLabel}>{a.label}</Text>
                       {a.is_default && (
                         <View style={s.defaultPill}>
-                          <Text style={s.defaultPillText}>DEFAULT</Text>
+                          <Text style={s.defaultPillText}>{t("checkout.default_caps")}</Text>
                         </View>
                       )}
                     </View>
@@ -238,27 +242,27 @@ export default function Checkout() {
         {addresses.length > 0 && (
           <Pressable onPress={() => router.push("/add-address")} style={s.addAddrBtn}>
             <Ionicons name="add-circle-outline" size={18} color="#FF6B2C" />
-            <Text style={s.addAddrText}>Add new address</Text>
+            <Text style={s.addAddrText}>{t("addresses.add_new")}</Text>
           </Pressable>
         )}
 
         {/* Delivery slot */}
-        <Text style={[s.sectionTitle, { marginTop: 24 }]}>Delivery slot</Text>
+        <Text style={[s.sectionTitle, { marginTop: 24 }]}>{t("checkout.delivery_slot")}</Text>
         <View style={s.card}>
           <View style={s.slotRow}>
             <View style={s.slotIcon}>
               <Ionicons name="flash" size={20} color="#FF6B2C" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={s.slotTitle}>Express · 2 hours</Text>
-              <Text style={s.slotSub}>Arrives by 4:30 PM today</Text>
+              <Text style={s.slotTitle}>{t("checkout.express_2h")}</Text>
+              <Text style={s.slotSub}>{t("checkout.arrives_today")}</Text>
             </View>
             <Text style={s.slotPrice}>AED 15</Text>
           </View>
         </View>
 
         {/* Payment */}
-        <Text style={[s.sectionTitle, { marginTop: 24 }]}>Payment method</Text>
+        <Text style={[s.sectionTitle, { marginTop: 24 }]}>{t("checkout.payment_method")}</Text>
         {payments.map((p) => {
           const active = pay === p.id;
           return (
@@ -284,17 +288,17 @@ export default function Checkout() {
             with server-side validation. */}
 
         {/* Order summary */}
-        <Text style={[s.sectionTitle, { marginTop: 24 }]}>Order summary</Text>
+        <Text style={[s.sectionTitle, { marginTop: 24 }]}>{t("checkout.review_summary")}</Text>
         <View style={s.card}>
           {items.length === 0 ? (
-            <Text style={{ color: "#64748B", fontSize: 13 }}>Your cart is empty.</Text>
+            <Text style={{ color: "#64748B", fontSize: 13 }}>{t("cart.empty")}</Text>
           ) : (
             items.map((it) => (
               <View key={it.product.id} style={s.itemRow}>
                 <Image source={{ uri: it.product.image }} style={s.itemImg} />
                 <View style={{ flex: 1 }}>
                   <Text style={s.itemName} numberOfLines={1}>{it.product.name}</Text>
-                  <Text style={s.itemMeta}>Qty {it.qty}</Text>
+                  <Text style={s.itemMeta}>{t("product.qty_short", { qty: it.qty })}</Text>
                 </View>
                 <Text style={s.itemPrice}>AED {(it.product.price * it.qty).toFixed(2)}</Text>
               </View>
@@ -302,16 +306,16 @@ export default function Checkout() {
           )}
           <View style={s.divider} />
           <View style={s.sumRow}>
-            <Text style={s.sumLbl}>Subtotal</Text>
+            <Text style={s.sumLbl}>{t("checkout.subtotal_label")}</Text>
             <Text style={s.sumVal}>AED {subtotal.toFixed(2)}</Text>
           </View>
           <View style={s.sumRow}>
-            <Text style={s.sumLbl}>Delivery</Text>
+            <Text style={s.sumLbl}>{t("checkout.delivery_label")}</Text>
             <Text style={s.sumVal}>AED {delivery.toFixed(2)}</Text>
           </View>
           <View style={s.divider} />
           <View style={s.sumRow}>
-            <Text style={s.totalLbl}>Total</Text>
+            <Text style={s.totalLbl}>{t("checkout.total_label")}</Text>
             <Text style={s.totalVal}>AED {total.toFixed(2)}</Text>
           </View>
         </View>
@@ -327,7 +331,9 @@ export default function Checkout() {
             <ActivityIndicator color="white" />
           ) : (
             <Text style={s.placeBtnText}>
-              {items.length === 0 ? "Cart is empty" : `Place order · AED ${total.toFixed(2)}`}
+              {items.length === 0
+                ? t("checkout.cart_is_empty")
+                : t("checkout.place_order_with_total", { total: total.toFixed(2) })}
             </Text>
           )}
         </Pressable>

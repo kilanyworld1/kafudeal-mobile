@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { View, Text, ScrollView, Image, Pressable, StyleSheet, Animated, ActivityIndicator } from "react-native";
+import { View, Text, ScrollView, Image, Pressable, StyleSheet, Animated, ActivityIndicator, I18nManager } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTranslation } from "react-i18next";
 import { productsAPI } from "../../lib/api";
 import { transformProduct } from "../../lib/transformers";
 import type { Product } from "../../lib/types";
@@ -11,6 +12,7 @@ import { useCart } from "../../lib/cart-context";
 export default function ProductDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const { add, toggleSaved, isSaved } = useCart();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
@@ -55,7 +57,7 @@ export default function ProductDetail() {
     return (
       <View style={s.loading}>
         <ActivityIndicator color="#FF6B2C" size="large" />
-        <Text style={{ color: "#64748B", marginTop: 14 }}>Loading…</Text>
+        <Text style={{ color: "#64748B", marginTop: 14 }}>{t("common.loading")}</Text>
       </View>
     );
   }
@@ -65,7 +67,7 @@ export default function ProductDetail() {
       <View style={s.loading}>
         <Ionicons name="alert-circle-outline" size={48} color="#94A3B8" />
         <Text style={{ color: "#0F172A", fontSize: 16, marginTop: 12, fontWeight: "800" }}>
-          Product not found
+          {t("product.product_not_found_title")}
         </Text>
         <Text style={{ color: "#64748B", fontSize: 11, marginTop: 6 }}>
           id: {String(id)}
@@ -76,11 +78,13 @@ export default function ProductDetail() {
           </Text>
         )}
         <Pressable onPress={() => router.back()} style={s.backCta}>
-          <Text style={s.backCtaText}>Go back</Text>
+          <Text style={s.backCtaText}>{t("product.go_back")}</Text>
         </Pressable>
       </View>
     );
   }
+
+  const backIconStyle = I18nManager.isRTL ? { transform: [{ scaleX: -1 }] as any } : undefined;
 
   return (
     <View style={s.root}>
@@ -90,7 +94,7 @@ export default function ProductDetail() {
 
           <View style={[s.topBar, { top: insets.top + 8 }]}>
             <Pressable onPress={() => router.back()} style={s.topBtn}>
-              <Ionicons name="chevron-back" size={22} color="#0F172A" />
+              <Ionicons name="chevron-back" size={22} color="#0F172A" style={backIconStyle} />
             </Pressable>
             <Pressable onPress={pressHeart} style={s.topBtn}>
               <Animated.View style={{ transform: [{ scale: heartScale }] }}>
@@ -117,7 +121,7 @@ export default function ProductDetail() {
             <Text style={s.priceWas}>AED {product.originalPrice}</Text>
             <View style={s.savePill}>
               <Text style={s.savePillText}>
-                Save AED {Math.max(0, product.originalPrice - product.discountedPrice).toFixed(0)}
+                {t("product.save_amount", { amount: Math.max(0, product.originalPrice - product.discountedPrice).toFixed(0) })}
               </Text>
             </View>
           </View>
@@ -125,30 +129,19 @@ export default function ProductDetail() {
           <View style={s.urgency}>
             <Ionicons name="time" size={16} color="#FF6B2C" />
             <Text style={s.urgencyText}>
-              {product.endsIn} {product.stock > 0 ? `· ${product.stock} left in stock` : ""}
+              {product.endsIn} {product.stock > 0 ? `· ${t("product.low_stock_only", { count: product.stock })}` : ""}
             </Text>
           </View>
 
-          {product.description ? (
-            <>
-              <Text style={s.sectionLabel}>About this product</Text>
-              <Text style={s.description}>{product.description}</Text>
-            </>
-          ) : (
-            <>
-              <Text style={s.sectionLabel}>About this product</Text>
-              <Text style={s.description}>
-                Stocked daily by our verified store partners. This product is near its best-before
-                date — perfectly safe to consume but priced to move so it doesn't go to waste.
-                Every listing is checked by KafuDeal before going live.
-              </Text>
-            </>
-          )}
+          <Text style={s.sectionLabel}>{t("product.about")}</Text>
+          <Text style={s.description}>
+            {product.description || t("product.no_description")}
+          </Text>
 
           <View style={s.trustRow}>
             <View style={s.trustBox}>
               <Ionicons name="shield-checkmark" size={20} color="#16A34A" />
-              <Text style={s.trustLbl}>VERIFIED</Text>
+              <Text style={s.trustLbl}>{t("product.verified_store")}</Text>
             </View>
             <View style={s.trustBox}>
               <Ionicons name="leaf-outline" size={20} color="#16A34A" />
@@ -156,7 +149,7 @@ export default function ProductDetail() {
             </View>
             <View style={s.trustBox}>
               <Ionicons name="time-outline" size={20} color="#1D4ED8" />
-              <Text style={s.trustLbl}>2H DELIVERY</Text>
+              <Text style={s.trustLbl}>{t("home.trust_2h").toUpperCase()}</Text>
             </View>
           </View>
         </View>
@@ -176,7 +169,7 @@ export default function ProductDetail() {
           <Pressable onPress={pressAdd} style={{ flex: 1 }}>
             <Animated.View style={[s.addBtn, { transform: [{ scale: addScale }] }]}>
               <Ionicons name="cart" size={20} color="white" />
-              <Text style={s.addBtnText}>Add to cart · AED {product.discountedPrice}</Text>
+              <Text style={s.addBtnText}>{t("product.add_to_cart")} · AED {product.discountedPrice}</Text>
             </Animated.View>
           </Pressable>
         </View>

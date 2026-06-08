@@ -1,27 +1,39 @@
 import { useEffect, useRef, useState } from "react";
-import { View, Text, ScrollView, Pressable, Image, StyleSheet, Animated, Easing, ActivityIndicator } from "react-native";
+import { View, Text, ScrollView, Pressable, Image, StyleSheet, Animated, Easing, ActivityIndicator, I18nManager } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTranslation } from "react-i18next";
 import { ordersAPI } from "../../lib/api";
 import { transformOrder } from "../../lib/transformers";
 import { supabase } from "../../lib/supabase";
 import type { Order } from "../../lib/types";
 import { openCrispChat } from "../../lib/crisp";
 
-const STEPS = [
-  // 'new' rows from older orders still map to step 0 so the tracker isn't blank
-  { keys: ["new", "pending", "confirmed"], emoji: "✓", label: "Confirmed" },
-  { keys: ["preparing", "ready", "ready_for_delivery", "ready_for_pickup"], emoji: "📦", label: "Preparing" },
-  { keys: ["on_the_way", "out_for_delivery"], emoji: "🚚", label: "On the Way" },
-  { keys: ["delivered"], emoji: "🏠", label: "Delivered" },
+// Step keys (status -> step index). Labels come from i18n via useStepLabels().
+const STEP_KEYS = [
+  ["new", "pending", "confirmed"],
+  ["preparing", "ready", "ready_for_delivery", "ready_for_pickup"],
+  ["on_the_way", "out_for_delivery"],
+  ["delivered"],
 ];
+const STEP_EMOJIS = ["✓", "📦", "🚚", "🏠"];
+
+function useSteps() {
+  const { t } = useTranslation();
+  return [
+    { keys: STEP_KEYS[0], emoji: STEP_EMOJIS[0], label: t("order_detail.step_confirmed") },
+    { keys: STEP_KEYS[1], emoji: STEP_EMOJIS[1], label: t("order_detail.step_preparing") },
+    { keys: STEP_KEYS[2], emoji: STEP_EMOJIS[2], label: t("order_detail.step_on_way") },
+    { keys: STEP_KEYS[3], emoji: STEP_EMOJIS[3], label: t("order_detail.step_delivered") },
+  ];
+}
 
 function statusToStepIndex(status: string): number {
   const s = (status || "").toLowerCase();
-  for (let i = 0; i < STEPS.length; i++) {
-    if (STEPS[i].keys.includes(s)) return i;
+  for (let i = 0; i < STEP_KEYS.length; i++) {
+    if (STEP_KEYS[i].includes(s)) return i;
   }
   return 0;
 }
@@ -29,6 +41,8 @@ function statusToStepIndex(status: string): number {
 export default function OrderTracking() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
+  const STEPS = useSteps();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -111,7 +125,7 @@ export default function OrderTracking() {
     return (
       <View style={s.loading}>
         <ActivityIndicator color="#FF6B2C" size="large" />
-        <Text style={{ color: "#64748B", marginTop: 14 }}>Loading order…</Text>
+        <Text style={{ color: "#64748B", marginTop: 14 }}>{t("order_detail.loading_order")}</Text>
       </View>
     );
   }
@@ -121,10 +135,10 @@ export default function OrderTracking() {
       <View style={s.loading}>
         <Ionicons name="alert-circle-outline" size={48} color="#94A3B8" />
         <Text style={{ color: "#0F172A", fontSize: 16, marginTop: 12, fontWeight: "800" }}>
-          Order not found
+          {t("order_detail.order_not_found")}
         </Text>
         <Pressable onPress={() => router.replace("/(tabs)/orders")} style={s.backCta}>
-          <Text style={s.backCtaText}>Back to orders</Text>
+          <Text style={s.backCtaText}>{t("order_detail.back_to_orders")}</Text>
         </Pressable>
       </View>
     );
@@ -132,19 +146,21 @@ export default function OrderTracking() {
 
   const stageEmoji = cancelled ? "❌" : step === 0 ? "✅" : step === 1 ? "📦" : step === 2 ? "🚚" : "🎉";
   const stageTitle = cancelled
-    ? "Order cancelled"
-    : step === 0 ? "Order confirmed"
-    : step === 1 ? "Preparing your order"
-    : step === 2 ? "On the way to you"
-    : "Order delivered";
+    ? t("order_detail.stage_cancelled")
+    : step === 0 ? t("order_detail.stage_confirmed")
+    : step === 1 ? t("order_detail.stage_preparing")
+    : step === 2 ? t("order_detail.stage_on_way")
+    : t("order_detail.stage_delivered");
   const stageSub = cancelled
-    ? "If you didn't ask for this, contact support"
-    : step === 0 ? "Sent to the store"
-    : step === 1 ? "Estimated arrival 30–45 min"
-    : step === 2 ? "Arriving in ~10 min"
-    : "Hope you enjoyed!";
+    ? t("order_detail.stage_cancelled_sub")
+    : step === 0 ? t("order_detail.stage_confirmed_sub")
+    : step === 1 ? t("order_detail.stage_preparing_sub")
+    : step === 2 ? t("order_detail.stage_on_way_sub")
+    : t("order_detail.stage_delivered_sub");
 
   const items = order.items || [];
+  const backIconStyle = I18nManager.isRTL ? { transform: [{ scaleX: -1 }] as any } : undefined;
+  const chevronStyle = I18nManager.isRTL ? { transform: [{ scaleX: -1 }] as any } : undefined;
 
   return (
     <View style={s.root}>
@@ -158,12 +174,14 @@ export default function OrderTracking() {
           style={s.backBtn}
           hitSlop={12}
         >
-          <Ionicons name="chevron-back" size={22} color="#0F172A" />
+          <Ionicons name="chevron-back" size={22} color="#0F172A" style={backIconStyle} />
         </Pressable>
-        <View style={{ flex: 1, marginLeft: 8 }}>
+        <View style={{ flex: 1, marginStart: 8 }}>
           <Text style={s.topId}>#{order.shortId}</Text>
           <Text style={s.topSub}>
-            Placed {formatTime(order.createdAt)} · {order.itemsCount} {order.itemsCount === 1 ? "item" : "items"}
+            {order.itemsCount === 1
+              ? t("order_detail.placed_at_with_count_one", { time: formatTime(order.createdAt) })
+              : t("order_detail.placed_at_with_count", { time: formatTime(order.createdAt), count: order.itemsCount })}
           </Text>
         </View>
       </View>
@@ -250,17 +268,17 @@ export default function OrderTracking() {
               </Animated.View>
               <View style={s.distChip}>
                 <Ionicons name="navigate" size={12} color="#FF6B2C" />
-                <Text style={s.distChipText}>1.2 km away</Text>
+                <Text style={s.distChipText}>{t("order_detail.km_away")}</Text>
               </View>
             </View>
 
             <View style={s.driverCard}>
               <View style={s.driverAvatar}><Text style={s.driverInitial}>A</Text></View>
               <View style={{ flex: 1 }}>
-                <Text style={s.driverName}>Ahmed M. · Your driver</Text>
+                <Text style={s.driverName}>Ahmed M. · {t("order_detail.your_driver")}</Text>
                 <View style={s.starRow}>
                   <Ionicons name="star" size={11} color="#F59E0B" />
-                  <Text style={s.driverMeta}>4.9 · Honda CB · F-7421</Text>
+                  <Text style={s.driverMeta}>{t("order_detail.driver_meta")}</Text>
                 </View>
               </View>
               <Pressable style={[s.iconCircle, { backgroundColor: "#ECFDF5" }]}>
@@ -279,16 +297,16 @@ export default function OrderTracking() {
               <Ionicons name="chatbubble-ellipses" size={20} color="#FF6B2C" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={s.chatTitle}>Chat with KafuDeal</Text>
-              <Text style={s.chatSub}>Available while your order is in progress</Text>
+              <Text style={s.chatTitle}>{t("orders.chat_with_kafudeal")}</Text>
+              <Text style={s.chatSub}>{t("order_detail.available_chat")}</Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color="#FF6B2C" />
+            <Ionicons name="chevron-forward" size={18} color="#FF6B2C" style={chevronStyle} />
           </Pressable>
         )}
 
         {items.length > 0 && (
           <>
-            <Text style={s.sectionTitle}>Items</Text>
+            <Text style={s.sectionTitle}>{t("order_detail.items_title")}</Text>
             <View style={s.itemsCard}>
               {items.map((it, i) => (
                 <View key={i} style={[s.itemRow, i < items.length - 1 && s.itemRowBorder]}>
@@ -298,8 +316,8 @@ export default function OrderTracking() {
                     <View style={s.itemImg} />
                   )}
                   <View style={{ flex: 1 }}>
-                    <Text style={s.itemName}>{it.product?.name || "Item"}</Text>
-                    <Text style={s.itemMeta}>× {it.qty} · AED {it.price} each</Text>
+                    <Text style={s.itemName}>{it.product?.name || t("order_detail.item_default_name")}</Text>
+                    <Text style={s.itemMeta}>{t("order_detail.item_qty_price_each", { qty: it.qty, price: it.price })}</Text>
                   </View>
                   <Text style={s.itemTotal}>AED {(it.price * it.qty).toFixed(2)}</Text>
                 </View>
@@ -310,14 +328,14 @@ export default function OrderTracking() {
 
         <View style={s.totalsCard}>
           <View style={s.totalsRow}>
-            <Text style={s.totalsLblBig}>Total</Text>
+            <Text style={s.totalsLblBig}>{t("order_detail.total_label_big")}</Text>
             <Text style={s.totalsValBig}>AED {order.total.toFixed(2)}</Text>
           </View>
         </View>
 
         <Pressable onPress={openCrispChat} style={s.helpBtn}>
           <Ionicons name="help-circle-outline" size={18} color="#FF6B2C" />
-          <Text style={s.helpBtnText}>Need help with this order?</Text>
+          <Text style={s.helpBtnText}>{t("order_detail.need_help_with_order")}</Text>
         </Pressable>
       </ScrollView>
     </View>

@@ -1,8 +1,9 @@
 import { useCallback, useState } from "react";
-import { View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator, Alert } from "react-native";
+import { View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator, Alert, I18nManager } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useFocusEffect } from "expo-router";
+import { useTranslation } from "react-i18next";
 import { addressesAPI } from "../lib/api";
 
 type Address = {
@@ -25,6 +26,7 @@ const iconFor = (label?: string): "home" | "briefcase" | "location" => {
 
 export default function Addresses() {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -49,17 +51,17 @@ export default function Addresses() {
 
   const handleDelete = (addr: Address) => {
     Alert.alert(
-      "Delete address?",
-      `Remove "${addr.label}" from your saved addresses?`,
+      t("addresses.delete_confirm"),
+      t("addresses.delete_confirm_sub"),
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t("common.cancel"), style: "cancel" },
         {
-          text: "Delete",
+          text: t("common.delete"),
           style: "destructive",
           onPress: async () => {
             const { error } = await addressesAPI.remove(addr.id);
             if (error) {
-              Alert.alert("Couldn't delete", typeof error === "string" ? error : "Try again.");
+              Alert.alert(t("toast.something_wrong"), typeof error === "string" ? error : t("toast.try_again"));
               return;
             }
             setAddresses((prev) => prev.filter((a) => a.id !== addr.id));
@@ -72,7 +74,7 @@ export default function Addresses() {
   const handleSetDefault = async (addr: Address) => {
     const { error } = await addressesAPI.setDefault(addr.id);
     if (error) {
-      Alert.alert("Couldn't update", typeof error === "string" ? error : "Try again.");
+      Alert.alert(t("toast.something_wrong"), typeof error === "string" ? error : t("toast.try_again"));
       return;
     }
     // Optimistic update — flip is_default on the chosen row, off everywhere else
@@ -85,9 +87,9 @@ export default function Addresses() {
     <View style={s.root}>
       <View style={[s.topBar, { paddingTop: insets.top + 8 }]}>
         <Pressable onPress={() => router.back()} style={s.iconBtn}>
-          <Ionicons name="chevron-back" size={24} color="#0F172A" />
+          <Ionicons name="chevron-back" size={24} color="#0F172A" style={I18nManager.isRTL ? { transform: [{ scaleX: -1 }] } : undefined} />
         </Pressable>
-        <Text style={s.topTitle}>Addresses</Text>
+        <Text style={s.topTitle}>{t("addresses.title")}</Text>
         <View style={{ width: 36 }} />
       </View>
 
@@ -99,10 +101,8 @@ export default function Addresses() {
         ) : addresses.length === 0 ? (
           <View style={s.emptyBox}>
             <Ionicons name="location-outline" size={36} color="#FF6B2C" />
-            <Text style={s.emptyTitle}>No saved addresses yet</Text>
-            <Text style={s.emptySub}>
-              Add an address so we can deliver your orders here.
-            </Text>
+            <Text style={s.emptyTitle}>{t("addresses.no_addresses")}</Text>
+            <Text style={s.emptySub}>{t("addresses.no_addresses_sub")}</Text>
           </View>
         ) : (
           addresses.map((a) => (
@@ -116,7 +116,7 @@ export default function Addresses() {
                     <Text style={s.label}>{a.label}</Text>
                     {a.is_default && (
                       <View style={s.defaultPill}>
-                        <Text style={s.defaultPillText}>DEFAULT</Text>
+                        <Text style={s.defaultPillText}>{t("addresses.default")}</Text>
                       </View>
                     )}
                   </View>
@@ -134,12 +134,12 @@ export default function Addresses() {
                 {!a.is_default && (
                   <Pressable onPress={() => handleSetDefault(a)} style={s.actionBtn}>
                     <Ionicons name="star-outline" size={16} color="#0F172A" />
-                    <Text style={s.actionText}>Set default</Text>
+                    <Text style={s.actionText}>{t("addresses.set_default")}</Text>
                   </Pressable>
                 )}
                 <Pressable onPress={() => handleDelete(a)} style={s.actionBtn}>
                   <Ionicons name="trash-outline" size={16} color="#DC2626" />
-                  <Text style={[s.actionText, { color: "#DC2626" }]}>Delete</Text>
+                  <Text style={[s.actionText, { color: "#DC2626" }]}>{t("common.delete")}</Text>
                 </Pressable>
               </View>
             </View>
@@ -151,7 +151,7 @@ export default function Addresses() {
           style={s.addBtn}
         >
           <Ionicons name="add-circle" size={20} color="#FF6B2C" />
-          <Text style={s.addBtnText}>Add new address</Text>
+          <Text style={s.addBtnText}>{t("addresses.add_new")}</Text>
         </Pressable>
       </ScrollView>
     </View>

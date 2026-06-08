@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { View, Text, ScrollView, TextInput, Pressable, StyleSheet, KeyboardAvoidingView, Platform, Alert, ActivityIndicator } from "react-native";
+import { View, Text, ScrollView, TextInput, Pressable, StyleSheet, KeyboardAvoidingView, Platform, Alert, ActivityIndicator, I18nManager } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
+import { useTranslation } from "react-i18next";
 import * as Location from "expo-location";
 import { addressesAPI } from "../lib/api";
 import { useCart } from "../lib/cart-context";
@@ -20,18 +21,26 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label = "operation"): P
   });
 }
 
-const labels = ["Home", "Work", "Other"];
-
 export default function AddAddress() {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const { showToast } = useCart();
+
+  // Localized label tabs — we keep the canonical "Home"/"Work"/"Other"
+  // as the stored value, but display the translated label in the UI.
+  const labels: { value: string; display: string; icon: "home" | "briefcase" | "location" }[] = [
+    { value: "Home", display: t("addresses.home_label"), icon: "home" },
+    { value: "Work", display: t("addresses.work_label"), icon: "briefcase" },
+    { value: "Other", display: t("addresses.other_label"), icon: "location" },
+  ];
+
   const [label, setLabel] = useState("Home");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [building, setBuilding] = useState("");
   const [street, setStreet] = useState("");
   const [area, setArea] = useState("");
-  const [city, setCity] = useState("Dubai");
+  const [city, setCity] = useState(t("addresses.city_placeholder"));
   const [notes, setNotes] = useState("");
   const [setDefault, setSetDefault] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -51,9 +60,9 @@ export default function AddAddress() {
       if (status !== "granted") {
         setLocating(false);
         Alert.alert(
-          "Location permission needed",
-          "We can't get your address without location access. You can still type it in manually.",
-          [{ text: "OK" }]
+          t("addresses.location_permission_title"),
+          t("addresses.location_permission_sub"),
+          [{ text: t("common.ok") }]
         );
         return;
       }
@@ -129,9 +138,9 @@ export default function AddAddress() {
       if (!place || (!place.city && !place.street && !place.name && !place.district)) {
         setLocating(false);
         Alert.alert(
-          "Got your location",
-          "We pinned your spot but couldn't auto-fill the address text. Please type it in below — your GPS location is saved.",
-          [{ text: "OK" }]
+          t("addresses.got_location_title"),
+          t("addresses.got_location_sub"),
+          [{ text: t("common.ok") }]
         );
         return;
       }
@@ -151,14 +160,14 @@ export default function AddAddress() {
 
       setLocating(false);
       // Confirm success with a toast so the user knows the form was filled.
-      showToast({ message: "Location set — review and save", kind: "save" });
+      showToast({ message: t("addresses.location_set_toast"), kind: "save" });
     } catch (err: any) {
       setLocating(false);
       // Friendlier message for the common timeout case.
       const msg = (err?.message || "").toLowerCase().includes("timed out")
-        ? "Couldn't get your location — your GPS is slow or off. Please type the address in."
-        : err?.message || "Couldn't get your location. Please type the address in.";
-      Alert.alert("Location error", msg);
+        ? t("addresses.gps_slow")
+        : err?.message || t("addresses.gps_generic");
+      Alert.alert(t("addresses.location_error_title"), msg);
     }
   };
 
@@ -180,25 +189,27 @@ export default function AddAddress() {
       const msg =
         typeof error === "string"
           ? error
-          : (error as any)?.message || "Couldn't save the address. Please try again.";
-      Alert.alert("Couldn't save", msg);
+          : (error as any)?.message || t("addresses.couldnt_save_sub");
+      Alert.alert(t("addresses.couldnt_save_title"), msg);
       return;
     }
 
     // Match the UX of saving a product to favourites — a toast confirms
     // the action without making the user wait on a modal Alert.
-    showToast({ message: "Address saved", kind: "save" });
+    showToast({ message: t("addresses.saved_toast"), kind: "save" });
     router.back();
   };
+
+  const backIconStyle = I18nManager.isRTL ? { transform: [{ scaleX: -1 }] as any } : undefined;
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <View style={s.root}>
         <View style={[s.topBar, { paddingTop: insets.top + 8 }]}>
           <Pressable onPress={() => router.back()} style={s.iconBtn}>
-            <Ionicons name="chevron-back" size={24} color="#0F172A" />
+            <Ionicons name="chevron-back" size={24} color="#0F172A" style={backIconStyle} />
           </Pressable>
-          <Text style={s.topTitle}>New address</Text>
+          <Text style={s.topTitle}>{t("addresses.new_address_title")}</Text>
           <View style={{ width: 36 }} />
         </View>
 
@@ -214,89 +225,89 @@ export default function AddAddress() {
             ) : (
               <>
                 <Ionicons name="locate" size={20} color="#FF6B2C" />
-                <Text style={s.locBtnText}>Use my current location</Text>
+                <Text style={s.locBtnText}>{t("addresses.use_current_location")}</Text>
               </>
             )}
           </Pressable>
 
           <View style={s.orRow}>
             <View style={s.orLine} />
-            <Text style={s.orText}>OR ENTER MANUALLY</Text>
+            <Text style={s.orText}>{t("addresses.or_enter_manually")}</Text>
             <View style={s.orLine} />
           </View>
 
           {/* Label tabs */}
-          <Text style={s.label}>Label</Text>
+          <Text style={s.label}>{t("addresses.label_field")}</Text>
           <View style={s.tabRow}>
             {labels.map((l) => (
               <Pressable
-                key={l}
-                onPress={() => setLabel(l)}
-                style={[s.tab, label === l && s.tabActive]}
+                key={l.value}
+                onPress={() => setLabel(l.value)}
+                style={[s.tab, label === l.value && s.tabActive]}
               >
                 <Ionicons
-                  name={l === "Home" ? "home" : l === "Work" ? "briefcase" : "location"}
+                  name={l.icon}
                   size={14}
-                  color={label === l ? "#FF6B2C" : "#64748B"}
+                  color={label === l.value ? "#FF6B2C" : "#64748B"}
                 />
-                <Text style={[s.tabText, label === l && s.tabTextActive]}>{l}</Text>
+                <Text style={[s.tabText, label === l.value && s.tabTextActive]}>{l.display}</Text>
               </Pressable>
             ))}
           </View>
 
-          <Text style={s.label}>Full name</Text>
+          <Text style={s.label}>{t("addresses.full_name")}</Text>
           <TextInput
             value={name} onChangeText={setName}
-            placeholder="Your name"
+            placeholder={t("addresses.name_placeholder")}
             placeholderTextColor="#94A3B8"
             style={s.input}
           />
 
-          <Text style={s.label}>Phone</Text>
+          <Text style={s.label}>{t("addresses.phone_field")}</Text>
           <TextInput
             value={phone} onChangeText={setPhone}
-            placeholder="+971 50 000 0000"
+            placeholder={t("addresses.phone_placeholder")}
             placeholderTextColor="#94A3B8"
             keyboardType="phone-pad"
             style={s.input}
           />
 
-          <Text style={s.label}>Building / Apartment</Text>
+          <Text style={s.label}>{t("addresses.building_apartment")}</Text>
           <TextInput
             value={building} onChangeText={setBuilding}
-            placeholder="e.g. Marina Towers, Tower 3, Apt 1402"
+            placeholder={t("addresses.building_placeholder")}
             placeholderTextColor="#94A3B8"
             style={s.input}
           />
 
-          <Text style={s.label}>Street (optional)</Text>
+          <Text style={s.label}>{t("addresses.street_optional")}</Text>
           <TextInput
             value={street} onChangeText={setStreet}
-            placeholder="e.g. Sheikh Zayed Rd"
+            placeholder={t("addresses.street_placeholder")}
             placeholderTextColor="#94A3B8"
             style={s.input}
           />
 
-          <Text style={s.label}>Area / Neighbourhood</Text>
+          <Text style={s.label}>{t("addresses.area_neighborhood")}</Text>
           <TextInput
             value={area} onChangeText={setArea}
-            placeholder="e.g. Dubai Marina"
+            placeholder={t("addresses.area_placeholder")}
             placeholderTextColor="#94A3B8"
             style={s.input}
           />
 
-          <Text style={s.label}>City</Text>
+          <Text style={s.label}>{t("addresses.city_field")}</Text>
           <TextInput
             value={city} onChangeText={setCity}
-            placeholder="Dubai"
+            placeholder={t("addresses.city_placeholder")}
             placeholderTextColor="#94A3B8"
             style={s.input}
           />
 
-          <Text style={s.label}>Delivery notes (optional)</Text>
+          <Text style={s.label}>{t("addresses.notes_optional")}</Text>
           <TextInput
             value={notes} onChangeText={setNotes}
-            placeholder="e.g. Leave at reception"
+            placeholder={t("addresses.notes_placeholder_field")}
             placeholderTextColor="#94A3B8"
             multiline
             style={[s.input, { height: 80, textAlignVertical: "top", paddingTop: 12 }]}
@@ -309,7 +320,7 @@ export default function AddAddress() {
             <View style={[s.check, setDefault && s.checkOn]}>
               {setDefault && <Ionicons name="checkmark" size={14} color="white" />}
             </View>
-            <Text style={s.checkText}>Set as default address</Text>
+            <Text style={s.checkText}>{t("addresses.set_default_address")}</Text>
           </Pressable>
         </ScrollView>
 
@@ -322,7 +333,7 @@ export default function AddAddress() {
             {saving ? (
               <ActivityIndicator color="white" />
             ) : (
-              <Text style={s.saveBtnText}>Save address</Text>
+              <Text style={s.saveBtnText}>{t("addresses.save_address")}</Text>
             )}
           </Pressable>
         </View>
