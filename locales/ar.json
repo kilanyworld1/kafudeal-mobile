@@ -94,7 +94,15 @@
     "expires_today": "تنتهي اليوم",
     "verified_seller": "بائع موثوق",
     "about_product": "عن هذا المنتج",
-    "similar": "عروض مماثلة"
+    "similar": "عروض مماثلة",
+    "sold_by": "البائع",
+    "fresh_until": "طازج حتى {{date}}",
+    "save_amount": "وفّر {{amount}} درهم",
+    "low_stock_only": "متبقي {{count}} فقط",
+    "tap_to_view_store": "اضغط لعرض المتجر",
+    "description": "الوصف",
+    "no_description": "لا يوجد وصف",
+    "go_back": "العودة"
   },
   "cart": {
     "title": "السلة",
@@ -125,7 +133,22 @@
     "confirm_order": "تأكيد الطلب",
     "placing_order": "جاري إرسال طلبك...",
     "order_total": "إجمالي الطلب",
-    "free_delivery": "توصيل مجاني"
+    "free_delivery": "توصيل مجاني",
+    "select_address": "اختر عنوان التوصيل",
+    "no_addresses": "لا توجد عناوين محفوظة",
+    "add_first_address": "أضف عنوانك الأول للمتابعة",
+    "delivery_slot": "موعد التوصيل",
+    "as_soon_as_possible": "في أقرب وقت ممكن",
+    "pick_a_time": "اختر وقتاً",
+    "notes_placeholder": "أضف أي ملاحظات للتوصيل (اختياري)",
+    "review_summary": "ملخص الطلب",
+    "subtotal_label": "المجموع الفرعي",
+    "delivery_label": "التوصيل",
+    "total_label": "الإجمالي",
+    "place_order_with_total": "تأكيد الطلب · {{total}} درهم",
+    "pay_cash": "الدفع عند الاستلام",
+    "pay_card": "بطاقة ائتمان / خصم",
+    "voucher_applied": "تم تطبيق القسيمة"
   },
   "orders": {
     "title": "الطلبات",
@@ -193,7 +216,23 @@
     "use_current_location": "استخدم موقعي الحالي",
     "getting_location": "جاري تحديد موقعك...",
     "edit": "تعديل",
-    "no_addresses_sub": "أضف عنواناً لتسريع عملية الدفع"
+    "no_addresses_sub": "أضف عنواناً لتسريع عملية الدفع",
+    "address_label": "تسمية العنوان",
+    "home_label": "المنزل",
+    "work_label": "العمل",
+    "other_label": "أخرى",
+    "city": "المدينة",
+    "building": "المبنى / الشارع",
+    "phone_optional": "الهاتف (اختياري)",
+    "set_default": "تعيين كافتراضي",
+    "is_default": "عنوان افتراضي",
+    "edit_address": "تعديل العنوان",
+    "delete_confirm": "حذف هذا العنوان؟",
+    "delete_confirm_sub": "يمكنك إضافته مرة أخرى لاحقاً.",
+    "choose_on_map": "اختر على الخريطة",
+    "detecting_location": "جاري تحديد موقعك...",
+    "location_denied": "تم رفض إذن الموقع",
+    "location_denied_sub": "فعّل الموقع في الإعدادات أو أدخل عنوانك يدوياً."
   },
   "account": {
     "title": "الحساب",
@@ -238,7 +277,13 @@
     "mark_all_read": "تمييز الكل كمقروء",
     "header_title": "الإشعارات",
     "empty_title": "لا توجد إشعارات بعد",
-    "track_order": "تتبع الطلب"
+    "track_order": "تتبع الطلب",
+    "signed_out_title": "سجّل دخولك لرؤية إشعاراتك",
+    "signed_out_sub": "تحديثات الطلب والتنبيهات المخصصة ستظهر هنا.",
+    "all_caught_up_title": "أنت على اطّلاع بكل شيء",
+    "all_caught_up_sub": "سنخبرك بمجرد حدوث أي تغيير في طلباتك.",
+    "yesterday": "أمس",
+    "everything_for_now": "هذا كل شيء حالياً"
   },
   "notif_prompt": {
     "title": "ابقَ على اطلاع بطلباتك",
@@ -257,7 +302,7 @@
     "password_security": "كلمة المرور والأمان",
     "biometric": "تسجيل الدخول البيومتري",
     "order_updates": "تحديثات الطلب",
-    "flash_deals": "عروض سريعة",
+    "flash_deals": "عروض سريعة وخصومات",
     "news_tips": "أخبار ونصائح",
     "email_updates": "تحديثات البريد",
     "sms_updates": "تحديثات الرسائل النصية",
@@ -270,7 +315,19 @@
     "coming_soon": "قريباً — نعمل على هذا.",
     "title": "الإعدادات",
     "lang_english": "English",
-    "lang_arabic": "العربية"
+    "lang_arabic": "العربية",
+    "biometric_login": "تسجيل الدخول البيومتري",
+    "theme_light": "فاتح",
+    "privacy_policy_row": "سياسة الخصوصية",
+    "about_kafudeal_msg": "كافوديل v0.13.0\nصُنع بكل 💛 في الإمارات\n\nننقذ المواد الغذائية قريبة الانتهاء من الهدر ونمنحك الوفر.",
+    "sign_out_confirm": "هل أنت متأكد أنك تريد تسجيل الخروج؟",
+    "delete_account_confirm": "سيؤدي هذا إلى حذف حسابك وملفك الشخصي وسلتك وعناصرك المحفوظة والإشعارات بشكل دائم. سنحتفظ بالطلبات السابقة في سجلاتنا لأغراض قانونية ومحاسبية ولكن لن تكون مرتبطة بحسابك.\n\nلا يمكن التراجع عن هذا. هل أنت متأكد؟",
+    "final_confirmation": "تأكيد نهائي",
+    "final_confirmation_msg": "لا حاجة للكتابة، لكن هذه فرصتك الأخيرة. حذف الحساب؟",
+    "yes_delete_forever": "نعم، احذف نهائياً",
+    "made_with_love": "صُنع بكل 💛 في الإمارات",
+    "delete_help": "يحذف حسابك وبياناتك الشخصية بشكل دائم. الطلبات السابقة تُجعل مجهولة الهوية للسجلات القانونية. لا يمكن التراجع.",
+    "couldnt_delete": "تعذّر حذف الحساب"
   },
   "tab": {
     "home": "الرئيسية",
@@ -294,7 +351,31 @@
     "faq_sub": "أسئلة متكررة",
     "order_issue": "مشكلة في طلب؟",
     "order_issue_sub": "ابحث عن طلباتك الأخيرة في تبويب الطلبات",
-    "browse_orders": "تصفّح طلباتي"
+    "browse_orders": "تصفّح طلباتي",
+    "help_center": "مركز المساعدة",
+    "chat_with_us_avg": "متوسط الرد < 2 دقيقة",
+    "call_us": "اتصل بنا",
+    "call_number": "+971 800 KAFU",
+    "browse_topics": "تصفّح المواضيع",
+    "frequently_asked": "الأسئلة الشائعة",
+    "topic_my_orders": "طلباتي",
+    "topic_orders_sub": "تتبع، تعديل، إرجاع",
+    "topic_payments": "المدفوعات والاستردادات",
+    "topic_delivery": "التوصيل والعناوين",
+    "topic_food_safety": "سلامة الغذاء وانتهاء الصلاحية",
+    "topic_vouchers": "القسائم والعروض",
+    "topic_account": "الحساب والإعدادات",
+    "faq_safe_q": "هل المنتجات قريبة الانتهاء آمنة للأكل؟",
+    "faq_safe_a": "نعم. جميع المنتجات في كافوديل ضمن تاريخ \"يفضل استخدامه قبل\" أو \"صالح للاستخدام حتى\" وقد اجتازت فحص الجودة. لا نبيع المنتجات بعد انتهاء صلاحيتها.",
+    "faq_wrong_q": "ماذا لو كان طلبي خاطئاً أو تالفاً؟",
+    "faq_wrong_a": "اضغط على \"بحاجة للمساعدة\" في صفحة الطلب خلال 24 ساعة من التوصيل. سنسترد أو نستبدل أي منتج لا يطابق الوصف.",
+    "faq_fast_q": "ما سرعة التوصيل؟",
+    "faq_fast_a": "التوصيل السريع يصل خلال ساعتين. يمكن اختيار مواعيد محددة عند الدفع.",
+    "faq_areas_q": "ما المناطق التي توصلون إليها؟",
+    "faq_areas_a": "حالياً دبي (المارينا، JLT، وسط المدينة، الخليج التجاري). قريباً أبوظبي والشارقة.",
+    "still_need_help": "تحتاج مساعدة إضافية؟",
+    "team_online": "فريقنا متواجد 7 أيام في الأسبوع.",
+    "start_chat": "ابدأ محادثة"
   },
   "toast": {
     "something_wrong": "حدث خطأ ما",
@@ -307,7 +388,11 @@
     "address_required": "يرجى اختيار عنوان التوصيل",
     "cart_empty": "سلتك فارغة",
     "min_order": "الحد الأدنى للطلب {{amount}} درهم",
-    "order_failed": "تعذّر إرسال الطلب. حاول مرة أخرى."
+    "order_failed": "تعذّر إرسال الطلب. حاول مرة أخرى.",
+    "signed_in_success": "تم تسجيل الدخول!",
+    "signed_out_success": "تم تسجيل الخروج",
+    "item_added": "تمت الإضافة إلى السلة",
+    "item_removed": "تمت الإزالة"
   },
   "category": {
     "bakery": "المخبوزات",
@@ -342,7 +427,16 @@
     "empty_sub": "سنضيف أكواد الخصم هنا عند توفرها",
     "active": "نشطة",
     "used": "مستخدمة",
-    "expired": "منتهية"
+    "expired": "منتهية",
+    "apply_voucher_button": "تطبيق القسيمة",
+    "enter_code": "أدخل رمز القسيمة",
+    "redeem": "استخدام",
+    "valid_until": "صالحة حتى {{date}}",
+    "min_order_value": "الحد الأدنى للطلب {{amount}} درهم",
+    "how_it_works": "كيف يعمل",
+    "how_it_works_1": "تصفّح العروض وأضف إلى السلة",
+    "how_it_works_2": "طبّق رمز القسيمة عند الدفع",
+    "how_it_works_3": "استمتع بالخصم"
   },
   "order_detail": {
     "order_confirmed": "تم تأكيد الطلب",
@@ -357,6 +451,16 @@
     "need_help": "تحتاج مساعدة بخصوص هذا الطلب؟",
     "placed": "تم الطلب",
     "delivery_address": "عنوان التوصيل",
-    "payment": "الدفع"
+    "payment": "الدفع",
+    "order_number": "طلب #{{shortId}}",
+    "cancel_order": "إلغاء الطلب",
+    "cancel_order_confirm": "هل أنت متأكد أنك تريد إلغاء هذا الطلب؟",
+    "yes_cancel": "نعم، إلغاء",
+    "no_keep": "لا، احتفظ به",
+    "reorder_button": "إعادة الطلب",
+    "rate_order": "قيّم هذا الطلب",
+    "thank_you": "شكراً على طلبك!",
+    "driver_name": "السائق",
+    "driver_phone": "اتصل بالسائق"
   }
 }

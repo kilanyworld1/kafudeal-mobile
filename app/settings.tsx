@@ -42,7 +42,7 @@ export default function Settings() {
     currentLang === "ar" ? t("account.language_arabic") : t("account.language_english");
 
   const comingSoon = (feature: string) =>
-    Alert.alert(`${feature}`, "Coming soon — we're working on this.");
+    Alert.alert(`${feature}`, t("settings.coming_soon"));
 
   const openTerms = () => WebBrowser.openBrowserAsync("https://kafudeal.com/terms.html");
   const openPrivacy = () => WebBrowser.openBrowserAsync("https://kafudeal.com/privacy.html");
@@ -142,11 +142,11 @@ export default function Settings() {
         {/* Account */}
         <Text style={s.section}>{t("account.title").toUpperCase()}</Text>
         <View style={s.group}>
-          <Row icon="person-outline" label="Personal info" onPress={() => comingSoon("Personal info")} />
-          <Row icon="lock-closed-outline" label="Password & security" onPress={() => comingSoon("Password & security")} />
+          <Row icon="person-outline" label={t("settings.personal_info")} onPress={() => comingSoon(t("settings.personal_info"))} />
+          <Row icon="lock-closed-outline" label={t("settings.password_security")} onPress={() => comingSoon(t("settings.password_security"))} />
           <Row
             icon="finger-print-outline"
-            label="Use biometric login"
+            label={t("settings.biometric_login")}
             toggle
             value={biometric}
             onChange={setBiometric}
@@ -157,19 +157,19 @@ export default function Settings() {
         {/* Notifications */}
         <Text style={s.section}>{t("account.notifications").toUpperCase()}</Text>
         <View style={s.group}>
-          <Row icon="cube-outline" label="Order updates" toggle value={pushOrder} onChange={setPushOrder} />
-          <Row icon="flame-outline" label="Flash deals & offers" toggle value={pushDeals} onChange={setPushDeals} />
-          <Row icon="newspaper-outline" label="News & tips" toggle value={pushNews} onChange={setPushNews} last />
+          <Row icon="cube-outline" label={t("settings.order_updates")} toggle value={pushOrder} onChange={setPushOrder} />
+          <Row icon="flame-outline" label={t("settings.flash_deals")} toggle value={pushDeals} onChange={setPushDeals} />
+          <Row icon="newspaper-outline" label={t("settings.news_tips")} toggle value={pushNews} onChange={setPushNews} last />
         </View>
 
-        <Text style={s.section}>EMAIL & SMS</Text>
+        <Text style={s.section}>{t("settings.section_email_sms")}</Text>
         <View style={s.group}>
-          <Row icon="mail-outline" label="Email updates" toggle value={email} onChange={setEmail} />
-          <Row icon="chatbubble-outline" label="SMS updates" toggle value={sms} onChange={setSms} last />
+          <Row icon="mail-outline" label={t("settings.email_updates")} toggle value={email} onChange={setEmail} />
+          <Row icon="chatbubble-outline" label={t("settings.sms_updates")} toggle value={sms} onChange={setSms} last />
         </View>
 
         {/* Preferences */}
-        <Text style={s.section}>PREFERENCES</Text>
+        <Text style={s.section}>{t("settings.section_preferences")}</Text>
         <View style={s.group}>
           <Row
             icon="language-outline"
@@ -177,23 +177,23 @@ export default function Settings() {
             value2={currentLangLabel}
             onPress={() => setLangPickerOpen(true)}
           />
-          <Row icon="cash-outline" label="Currency" value2="AED" onPress={() => comingSoon("Currency")} />
-          <Row icon="moon-outline" label="Theme" value2="Light" onPress={() => comingSoon("Theme")} last />
+          <Row icon="cash-outline" label={t("settings.currency")} value2="AED" onPress={() => comingSoon(t("settings.currency"))} />
+          <Row icon="moon-outline" label={t("settings.theme")} value2={t("settings.theme_light")} onPress={() => comingSoon(t("settings.theme"))} last />
         </View>
 
         {/* Legal */}
-        <Text style={s.section}>LEGAL</Text>
+        <Text style={s.section}>{t("settings.section_legal")}</Text>
         <View style={s.group}>
-          <Row icon="document-text-outline" label={t("auth.terms")} onPress={openTerms} />
-          <Row icon="shield-outline" label={t("auth.privacy")} onPress={openPrivacy} />
+          <Row icon="document-text-outline" label={t("settings.terms_of_service")} onPress={openTerms} />
+          <Row icon="shield-outline" label={t("settings.privacy_policy_row")} onPress={openPrivacy} />
           <Row
             icon="information-circle-outline"
-            label="About KafuDeal"
+            label={t("settings.about_kafudeal")}
             value2="v0.13.0"
             onPress={() =>
               Alert.alert(
-                "About KafuDeal",
-                "KafuDeal v0.13.0\nMade with 💛 in the UAE\n\nWe rescue near-expiry groceries from waste and pass the savings to you."
+                t("settings.about_kafudeal"),
+                t("settings.about_kafudeal_msg")
               )
             }
             last

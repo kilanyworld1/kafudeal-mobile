@@ -94,7 +94,15 @@
     "expires_today": "Expires today",
     "verified_seller": "Verified seller",
     "about_product": "About this product",
-    "similar": "Similar deals"
+    "similar": "Similar deals",
+    "sold_by": "Sold by",
+    "fresh_until": "Fresh until {{date}}",
+    "save_amount": "Save AED {{amount}}",
+    "low_stock_only": "Only {{count}} left",
+    "tap_to_view_store": "Tap to view store",
+    "description": "Description",
+    "no_description": "No description provided",
+    "go_back": "Go back"
   },
   "cart": {
     "title": "Cart",
@@ -125,7 +133,22 @@
     "confirm_order": "Confirm order",
     "placing_order": "Placing your order...",
     "order_total": "Order total",
-    "free_delivery": "FREE delivery"
+    "free_delivery": "FREE delivery",
+    "select_address": "Select delivery address",
+    "no_addresses": "No addresses saved",
+    "add_first_address": "Add your first address to continue",
+    "delivery_slot": "Delivery slot",
+    "as_soon_as_possible": "As soon as possible",
+    "pick_a_time": "Pick a time",
+    "notes_placeholder": "Add any delivery notes (optional)",
+    "review_summary": "Order summary",
+    "subtotal_label": "Subtotal",
+    "delivery_label": "Delivery",
+    "total_label": "Total",
+    "place_order_with_total": "Place order · AED {{total}}",
+    "pay_cash": "Cash on delivery",
+    "pay_card": "Credit / Debit card",
+    "voucher_applied": "Voucher applied"
   },
   "orders": {
     "title": "Orders",
@@ -193,7 +216,23 @@
     "use_current_location": "Use my current location",
     "getting_location": "Getting your location...",
     "edit": "Edit",
-    "no_addresses_sub": "Add an address to speed up checkout"
+    "no_addresses_sub": "Add an address to speed up checkout",
+    "address_label": "Address label",
+    "home_label": "Home",
+    "work_label": "Work",
+    "other_label": "Other",
+    "city": "City",
+    "building": "Building / Street",
+    "phone_optional": "Phone (optional)",
+    "set_default": "Set as default",
+    "is_default": "Default address",
+    "edit_address": "Edit address",
+    "delete_confirm": "Delete this address?",
+    "delete_confirm_sub": "You can always add it again later.",
+    "choose_on_map": "Choose on map",
+    "detecting_location": "Detecting your location...",
+    "location_denied": "Location permission denied",
+    "location_denied_sub": "Enable location in settings or enter your address manually."
   },
   "account": {
     "title": "Account",
@@ -238,7 +277,13 @@
     "mark_all_read": "Mark all read",
     "header_title": "Notifications",
     "empty_title": "No notifications yet",
-    "track_order": "Track order"
+    "track_order": "Track order",
+    "signed_out_title": "Sign in to see your notifications",
+    "signed_out_sub": "Order updates and personalised alerts will show up here.",
+    "all_caught_up_title": "You're all caught up",
+    "all_caught_up_sub": "We'll let you know the moment something changes with your orders.",
+    "yesterday": "Yesterday",
+    "everything_for_now": "That's everything for now"
   },
   "notif_prompt": {
     "title": "Stay on top of your orders",
@@ -270,7 +315,19 @@
     "coming_soon": "Coming soon — we're working on this.",
     "title": "Settings",
     "lang_english": "English",
-    "lang_arabic": "العربية"
+    "lang_arabic": "العربية",
+    "biometric_login": "Use biometric login",
+    "theme_light": "Light",
+    "privacy_policy_row": "Privacy policy",
+    "about_kafudeal_msg": "KafuDeal v0.13.0\nMade with 💛 in the UAE\n\nWe rescue near-expiry groceries from waste and pass the savings to you.",
+    "sign_out_confirm": "Are you sure you want to sign out?",
+    "delete_account_confirm": "This will permanently delete your account, profile, cart, saved items, and notifications. Past orders will be kept in our records for legal and accounting purposes but will no longer be linked to your account.\n\nThis cannot be undone. Are you sure?",
+    "final_confirmation": "Final confirmation",
+    "final_confirmation_msg": "Type-confirm not required, but this is your last chance. Delete account?",
+    "yes_delete_forever": "Yes, delete forever",
+    "made_with_love": "Made with 💛 in the UAE",
+    "delete_help": "Permanently removes your account and personal data. Past orders are anonymized for legal record-keeping. Cannot be undone.",
+    "couldnt_delete": "Couldn't delete account"
   },
   "tab": {
     "home": "Home",
@@ -294,7 +351,31 @@
     "faq_sub": "Common questions",
     "order_issue": "Issue with an order?",
     "order_issue_sub": "Find your recent orders in the Orders tab",
-    "browse_orders": "Browse my orders"
+    "browse_orders": "Browse my orders",
+    "help_center": "Help center",
+    "chat_with_us_avg": "Avg reply < 2 min",
+    "call_us": "Call us",
+    "call_number": "+971 800 KAFU",
+    "browse_topics": "BROWSE TOPICS",
+    "frequently_asked": "FREQUENTLY ASKED",
+    "topic_my_orders": "My orders",
+    "topic_orders_sub": "Track, modify, return",
+    "topic_payments": "Payments & refunds",
+    "topic_delivery": "Delivery & addresses",
+    "topic_food_safety": "Food safety & expiry",
+    "topic_vouchers": "Vouchers & promotions",
+    "topic_account": "Account & settings",
+    "faq_safe_q": "Are near-expiry products safe to eat?",
+    "faq_safe_a": "Yes. All items on KafuDeal are within their stated 'best before' or 'use by' date and have passed our verified-store quality check. We never sell items past their safety date.",
+    "faq_wrong_q": "What if my order is wrong or damaged?",
+    "faq_wrong_a": "Tap 'Need help' on the order page within 24 hours of delivery. We'll refund or replace any item that doesn't match the listing.",
+    "faq_fast_q": "How fast is delivery?",
+    "faq_fast_a": "Express slots arrive within 2 hours. Scheduled slots can be picked at checkout.",
+    "faq_areas_q": "Which areas do you deliver to?",
+    "faq_areas_a": "Currently Dubai (Marina, JLT, Downtown, Business Bay). Expanding to Abu Dhabi and Sharjah soon.",
+    "still_need_help": "Still need help?",
+    "team_online": "Our team is online 7 days a week.",
+    "start_chat": "Start a chat"
   },
   "toast": {
     "something_wrong": "Something went wrong",
@@ -307,7 +388,11 @@
     "address_required": "Please select a delivery address",
     "cart_empty": "Your cart is empty",
     "min_order": "Minimum order is AED {{amount}}",
-    "order_failed": "Could not place order. Please try again."
+    "order_failed": "Could not place order. Please try again.",
+    "signed_in_success": "Signed in!",
+    "signed_out_success": "Signed out",
+    "item_added": "Added to cart",
+    "item_removed": "Removed"
   },
   "category": {
     "bakery": "Bakery",
@@ -342,7 +427,16 @@
     "empty_sub": "We'll add promo codes here when available",
     "active": "Active",
     "used": "Used",
-    "expired": "Expired"
+    "expired": "Expired",
+    "apply_voucher_button": "Apply voucher",
+    "enter_code": "Enter voucher code",
+    "redeem": "Redeem",
+    "valid_until": "Valid until {{date}}",
+    "min_order_value": "Min. order AED {{amount}}",
+    "how_it_works": "How it works",
+    "how_it_works_1": "Browse deals and add to cart",
+    "how_it_works_2": "Apply your voucher code at checkout",
+    "how_it_works_3": "Enjoy your discount"
   },
   "order_detail": {
     "order_confirmed": "Order confirmed",
@@ -357,6 +451,16 @@
     "need_help": "Need help with this order?",
     "placed": "Placed",
     "delivery_address": "Delivery Address",
-    "payment": "Payment"
+    "payment": "Payment",
+    "order_number": "Order #{{shortId}}",
+    "cancel_order": "Cancel order",
+    "cancel_order_confirm": "Are you sure you want to cancel this order?",
+    "yes_cancel": "Yes, cancel",
+    "no_keep": "No, keep it",
+    "reorder_button": "Reorder",
+    "rate_order": "Rate this order",
+    "thank_you": "Thank you for your order!",
+    "driver_name": "Driver",
+    "driver_phone": "Call driver"
   }
 }

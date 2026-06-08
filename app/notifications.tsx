@@ -1,8 +1,9 @@
 import { useMemo } from "react";
-import { View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator, RefreshControl } from "react-native";
+import { View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator, RefreshControl, I18nManager } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
+import { useTranslation } from "react-i18next";
 import { useNotifications, Notification } from "../lib/notifications-context";
 import { useAuth } from "../lib/auth-context";
 
@@ -33,19 +34,22 @@ function iconForType(type: string): IconMeta {
   return { icon: "notifications", tint: "#F1EFE8", iconColor: "#0F172A" };
 }
 
-function formatTime(iso: string): string {
-  const d = new Date(iso);
-  const now = new Date();
-  const diffMs = now.getTime() - d.getTime();
-  const diffMin = Math.floor(diffMs / (1000 * 60));
-  if (diffMin < 1) return "Just now";
-  if (diffMin < 60) return `${diffMin}m ago`;
-  const diffHrs = Math.floor(diffMin / 60);
-  if (diffHrs < 24) return `${diffHrs}h ago`;
-  const diffDays = Math.floor(diffHrs / 24);
-  if (diffDays === 1) return "Yesterday";
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+function useFormatTime() {
+  const { t } = useTranslation();
+  return (iso: string): string => {
+    const d = new Date(iso);
+    const now = new Date();
+    const diffMs = now.getTime() - d.getTime();
+    const diffMin = Math.floor(diffMs / (1000 * 60));
+    if (diffMin < 1) return t("notifications.just_now");
+    if (diffMin < 60) return t("notifications.minutes_ago", { count: diffMin });
+    const diffHrs = Math.floor(diffMin / 60);
+    if (diffHrs < 24) return t("notifications.hours_ago", { count: diffHrs });
+    const diffDays = Math.floor(diffHrs / 24);
+    if (diffDays === 1) return t("notifications.yesterday");
+    if (diffDays < 7) return t("notifications.days_ago", { count: diffDays });
+    return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  };
 }
 
 function isToday(iso: string): boolean {
@@ -56,6 +60,7 @@ function isToday(iso: string): boolean {
 
 export default function Notifications() {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { notifications, loading, refresh, markRead, markAllRead } = useNotifications();
 
@@ -78,6 +83,8 @@ export default function Notifications() {
     }
   };
 
+  const backIconStyle = I18nManager.isRTL ? { transform: [{ scaleX: -1 }] as any } : undefined;
+
   return (
     <View style={s.root}>
       <View style={[s.topBar, { paddingTop: insets.top + 8 }]}>
@@ -89,9 +96,9 @@ export default function Notifications() {
           style={s.iconBtn}
           hitSlop={12}
         >
-          <Ionicons name="chevron-back" size={24} color="#0F172A" />
+          <Ionicons name="chevron-back" size={24} color="#0F172A" style={backIconStyle} />
         </Pressable>
-        <Text style={s.topTitle}>Notifications</Text>
+        <Text style={s.topTitle}>{t("notifications.title")}</Text>
         <Pressable
           style={s.iconBtn}
           onPress={() => markAllRead()}
@@ -104,10 +111,10 @@ export default function Notifications() {
       {!user ? (
         <View style={s.empty}>
           <Ionicons name="notifications-off-outline" size={48} color="#94A3B8" />
-          <Text style={s.emptyTitle}>Sign in to see your notifications</Text>
-          <Text style={s.emptySub}>Order updates and personalised alerts will show up here.</Text>
+          <Text style={s.emptyTitle}>{t("notifications.signed_out_title")}</Text>
+          <Text style={s.emptySub}>{t("notifications.signed_out_sub")}</Text>
           <Pressable onPress={() => router.push("/login")} style={s.emptyCta}>
-            <Text style={s.emptyCtaText}>Sign in</Text>
+            <Text style={s.emptyCtaText}>{t("auth.sign_in")}</Text>
           </Pressable>
         </View>
       ) : loading && notifications.length === 0 ? (
@@ -117,8 +124,8 @@ export default function Notifications() {
       ) : notifications.length === 0 ? (
         <View style={s.empty}>
           <Ionicons name="notifications-outline" size={48} color="#94A3B8" />
-          <Text style={s.emptyTitle}>You're all caught up</Text>
-          <Text style={s.emptySub}>We'll let you know the moment something changes with your orders.</Text>
+          <Text style={s.emptyTitle}>{t("notifications.all_caught_up_title")}</Text>
+          <Text style={s.emptySub}>{t("notifications.all_caught_up_sub")}</Text>
         </View>
       ) : (
         <ScrollView
@@ -127,21 +134,21 @@ export default function Notifications() {
         >
           {today.length > 0 && (
             <>
-              <Text style={s.section}>TODAY</Text>
+              <Text style={s.section}>{t("notifications.today")}</Text>
               {today.map((n) => <NotifRow key={n.id} n={n} onPress={() => handlePress(n)} />)}
             </>
           )}
 
           {earlier.length > 0 && (
             <>
-              <Text style={[s.section, today.length > 0 && { marginTop: 18 }]}>EARLIER</Text>
+              <Text style={[s.section, today.length > 0 && { marginTop: 18 }]}>{t("notifications.earlier")}</Text>
               {earlier.map((n) => <NotifRow key={n.id} n={n} onPress={() => handlePress(n)} />)}
             </>
           )}
 
           <View style={s.footer}>
             <Ionicons name="notifications-outline" size={18} color="#94A3B8" />
-            <Text style={s.footerText}>That's everything for now</Text>
+            <Text style={s.footerText}>{t("notifications.everything_for_now")}</Text>
           </View>
         </ScrollView>
       )}
@@ -150,6 +157,8 @@ export default function Notifications() {
 }
 
 function NotifRow({ n, onPress }: { n: Notification; onPress: () => void }) {
+  const { t } = useTranslation();
+  const formatTime = useFormatTime();
   const meta = iconForType(n.type);
   return (
     <Pressable onPress={onPress} style={[s.card, !n.read && s.cardUnread]}>
@@ -165,7 +174,7 @@ function NotifRow({ n, onPress }: { n: Notification; onPress: () => void }) {
         <View style={s.metaRow}>
           <Text style={s.time}>{formatTime(n.created_at)}</Text>
           {n.related_type === "order" && (
-            <Text style={s.cta}>Track order →</Text>
+            <Text style={s.cta}>{t("notifications.track_order")} {I18nManager.isRTL ? "←" : "→"}</Text>
           )}
         </View>
       </View>
@@ -200,7 +209,7 @@ const s = StyleSheet.create({
   },
   titleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   title: { fontSize: 14, fontWeight: "800", color: "#0F172A", flex: 1 },
-  unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#FF6B2C", marginLeft: 8 },
+  unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#FF6B2C", marginStart: 8 },
   body: { fontSize: 12.5, color: "#334155", marginTop: 4, lineHeight: 18 },
   metaRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 6 },
   time: { fontSize: 11, color: "#94A3B8" },

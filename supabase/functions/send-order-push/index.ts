@@ -36,34 +36,62 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
-// Status -> push title/body. The body is a function so we can interpolate
-// the order id or other fields later. Keep messages short — Android lock
-// screens truncate after ~50 chars.
-const STATUS_MESSAGES: Record<
-  string,
-  { title: string; body: (orderId: string) => string }
-> = {
-  confirmed: {
-    title: "🎉 Order confirmed!",
-    body: () => "We've received your order. We'll let you know when it ships.",
+// Status -> push title/body, per language. We send in the customer's
+// preferred_language. Falls back to English.
+// Keep messages short — Android lock screens truncate after ~50 chars.
+type StatusMsg = { title: string; body: string };
+
+const MESSAGES: Record<string, Record<string, StatusMsg>> = {
+  en: {
+    confirmed: {
+      title: "🎉 Order confirmed!",
+      body: "We've received your order. We'll let you know when it ships.",
+    },
+    preparing: {
+      title: "👨‍🍳 Preparing your order",
+      body: "We're packing your items. Hang tight!",
+    },
+    out_for_delivery: {
+      title: "🛵 Your order is on the way!",
+      body: "Tap to track your delivery.",
+    },
+    delivered: {
+      title: "✅ Order delivered",
+      body: "Enjoy! Tap to rate your experience.",
+    },
+    cancelled: {
+      title: "Order cancelled",
+      body: "Your order has been cancelled. Tap to view details.",
+    },
   },
-  preparing: {
-    title: "👨‍🍳 Preparing your order",
-    body: () => "We're packing your items. Hang tight!",
-  },
-  out_for_delivery: {
-    title: "🛵 Your order is on the way!",
-    body: () => "Tap to track your delivery.",
-  },
-  delivered: {
-    title: "✅ Order delivered",
-    body: () => "Enjoy! Tap to rate your experience.",
-  },
-  cancelled: {
-    title: "Order cancelled",
-    body: () => "Your order has been cancelled. Tap to view details.",
+  ar: {
+    confirmed: {
+      title: "🎉 تم تأكيد الطلب!",
+      body: "استلمنا طلبك. سنخبرك عند خروجه للتوصيل.",
+    },
+    preparing: {
+      title: "👨‍🍳 جاري تحضير طلبك",
+      body: "نقوم بتجهيز منتجاتك. لحظات وستصلك!",
+    },
+    out_for_delivery: {
+      title: "🛵 طلبك في الطريق!",
+      body: "اضغط لتتبع التوصيل.",
+    },
+    delivered: {
+      title: "✅ تم تسليم طلبك",
+      body: "بالهنا! اضغط لتقييم تجربتك.",
+    },
+    cancelled: {
+      title: "تم إلغاء الطلب",
+      body: "تم إلغاء طلبك. اضغط لعرض التفاصيل.",
+    },
   },
 };
+
+function getMessage(status: string, lang: string): StatusMsg | null {
+  const langTable = MESSAGES[lang] || MESSAGES.en;
+  return langTable[status] || MESSAGES.en[status] || null;
+}
 
 serve(async (req) => {
   // CORS preflight
@@ -98,15 +126,6 @@ serve(async (req) => {
       return jsonResponse({ skipped: "order_status unchanged" }, 200);
     }
 
-    // Bail out if we don't have a message for this status
-    const msg = STATUS_MESSAGES[newStatus];
-    if (!msg) {
-      return jsonResponse(
-        { skipped: `no push template for status '${newStatus}'` },
-        200
-      );
-    }
-
     const customerId = record.customer_id;
     const orderId = record.id;
     if (!customerId || !orderId) {
@@ -120,12 +139,22 @@ serve(async (req) => {
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
-    // Honour the customer's notifications_enabled flag
+    // Honour the customer's notifications_enabled flag + read preferred_language
     const { data: customer } = await supabase
       .from("customers")
-      .select("id, notifications_enabled, name")
+      .select("id, notifications_enabled, name, preferred_language")
       .eq("id", customerId)
       .maybeSingle();
+
+    // Pick the message in the customer's language (falls back to English).
+    const lang = (customer?.preferred_language as string) || "en";
+    const msg = getMessage(newStatus, lang);
+    if (!msg) {
+      return jsonResponse(
+        { skipped: `no push template for status '${newStatus}'` },
+        200
+      );
+    }
 
     if (!customer) {
       return jsonResponse({ skipped: "customer not found" }, 200);
@@ -137,7 +166,7 @@ serve(async (req) => {
         customer_id: customerId,
         type: "order_status",
         title: msg.title,
-        body: msg.body(orderId),
+        body: msg.body,
         related_id: orderId,
         related_type: "order",
         read: false,
@@ -161,7 +190,7 @@ serve(async (req) => {
       customer_id: customerId,
       type: "order_status",
       title: msg.title,
-      body: msg.body(orderId),
+      body: msg.body,
       related_id: orderId,
       related_type: "order",
       read: false,
@@ -180,7 +209,7 @@ serve(async (req) => {
     const messages = tokens.map((to) => ({
       to,
       title: msg.title,
-      body: msg.body(orderId),
+      body: msg.body,
       sound: "default",
       priority: "high",
       data: {
