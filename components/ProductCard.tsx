@@ -2,6 +2,7 @@ import { useRef } from "react";
 import { View, Text, Image, Pressable, StyleSheet, Animated } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { useTranslation } from "react-i18next";
 import type { Product } from "../lib/types";
 import { useCart } from "../lib/cart-context";
 
@@ -12,6 +13,7 @@ type Props = {
 };
 
 export default function ProductCard({ product: p, width, variant = "default" }: Props) {
+  const { t } = useTranslation();
   const { add, toggleSaved, isSaved } = useCart();
   const heartScale = useRef(new Animated.Value(1)).current;
   const addScale = useRef(new Animated.Value(1)).current;
@@ -35,6 +37,10 @@ export default function ProductCard({ product: p, width, variant = "default" }: 
   };
 
   const urgent = (p.endsIn || "").toLowerCase().includes("h left");
+  // Localized fallback when the product has no partner name set.
+  const storeLabel = p.store && p.store.trim().length > 0
+    ? p.store
+    : t("product.verified_store");
 
   return (
     <Pressable
@@ -47,7 +53,7 @@ export default function ProductCard({ product: p, width, variant = "default" }: 
         {p.expiringSoon && (
           <View style={s.expSoon}>
             <Ionicons name="time" size={9} color="white" />
-            <Text style={s.expSoonText}>Expiring soon</Text>
+            <Text style={s.expSoonText}>{t("product.expiring_soon")}</Text>
           </View>
         )}
         <Pressable onPress={pressHeart} style={s.favBtn} hitSlop={8}>
@@ -60,7 +66,7 @@ export default function ProductCard({ product: p, width, variant = "default" }: 
           </Animated.View>
         </Pressable>
       </View>
-      <Text style={s.store} numberOfLines={1}>{p.store}</Text>
+      <Text style={s.store} numberOfLines={1}>{storeLabel}</Text>
       <Text style={s.name} numberOfLines={1}>{p.name}</Text>
       <View style={s.footRow}>
         <View style={{ flex: 1 }}>

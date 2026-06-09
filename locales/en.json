@@ -321,6 +321,7 @@
   },
   "account": {
     "title": "Account",
+    "notifications": "Notifications",
     "saved_deals": "Saved deals",
     "favorite": "favorite",
     "favorites": "favorites",
@@ -373,6 +374,7 @@
   "notif_prompt": {
     "title": "Stay on top of your orders",
     "body": "Get notified when your order is confirmed, on its way, and delivered.",
+    "denied_body": "Notifications are off. Enable them in your phone settings to get order updates.",
     "accept": "Yes, notify me",
     "maybe_later": "Maybe later",
     "open_settings": "Open Settings"
@@ -425,6 +427,7 @@
     "title": "Get help",
     "subtitle": "How can we help you today?",
     "chat_title": "Chat with us",
+    "chat_with_us": "Chat with us",
     "chat_sub": "Average reply in 5 minutes",
     "call_title": "Call support",
     "call_sub": "Available 9am - 9pm",
@@ -492,7 +495,13 @@
     "pantry": "Pantry",
     "snacks": "Snacks",
     "frozen": "Frozen",
-    "personal_care": "Personal care"
+    "personal_care": "Personal care",
+    "all": "All",
+    "top_deals": "Top deals",
+    "fresh": "Fresh",
+    "beauty": "Beauty",
+    "drinks": "Drinks",
+    "other": "Other"
   },
   "login": {
     "title": "Sign in to KafuDeal",

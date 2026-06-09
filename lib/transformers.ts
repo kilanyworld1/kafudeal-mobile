@@ -39,7 +39,9 @@ export function transformProduct(p: any): Product {
     discountedPrice: discounted,
     discountPercentage: discountPct,
     image: p.image_url || "",
-    store: p.partners?.name || "VERIFIED STORE",
+    // Use empty string when no partner — components will fall back to a
+    // localized "Verified store" label rather than hardcoding English here.
+    store: p.partners?.name || "",
     category: p.categories?.name || "",
     categoryId: p.category_id,
     partnerId: p.partner_id,

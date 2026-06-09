@@ -1,8 +1,9 @@
-import { View, Text, ScrollView, Pressable, Image, StyleSheet } from "react-native";
+import { View, Text, ScrollView, Pressable, Image, StyleSheet, I18nManager } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, router } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
+import { useTranslation } from "react-i18next";
 import { products } from "../../data/products";
 
 const STORES: Record<string, { name: string; tagline: string; cover: string; rating: number; reviews: number; eta: string; minOrder: number; }> = {
@@ -23,8 +24,23 @@ const STORES: Record<string, { name: string; tagline: string; cover: string; rat
 export default function StorePage() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const store = STORES[id || "default"] || STORES["default"];
   const items = products;
+
+  // Categories now come from JSON so they show in Arabic when the app
+  // is in Arabic. Order matches the previous hardcoded English list.
+  const categoryChips = [
+    { key: "all", label: t("category.all") },
+    { key: "top_deals", label: t("category.top_deals") },
+    { key: "snacks", label: t("category.snacks") },
+    { key: "dairy", label: t("category.dairy") },
+    { key: "fresh", label: t("category.fresh") },
+    { key: "bakery", label: t("category.bakery") },
+    { key: "beauty", label: t("category.beauty") },
+  ];
+
+  const backIconStyle = I18nManager.isRTL ? { transform: [{ scaleX: -1 }] as any } : undefined;
 
   return (
     <View style={s.root}>
@@ -38,7 +54,7 @@ export default function StorePage() {
           />
           <View style={[s.topBar, { top: insets.top + 8 }]}>
             <Pressable onPress={() => router.back()} style={s.iconBtn}>
-              <Ionicons name="chevron-back" size={22} color="#0F172A" />
+              <Ionicons name="chevron-back" size={22} color="#0F172A" style={backIconStyle} />
             </Pressable>
             <View style={{ flexDirection: "row", gap: 8 }}>
               <Pressable style={s.iconBtn}>
@@ -65,24 +81,24 @@ export default function StorePage() {
                 <Ionicons name="star" size={14} color="#F59E0B" />
                 <Text style={s.statNum}>{store.rating}</Text>
               </View>
-              <Text style={s.statLbl}>{store.reviews.toLocaleString()} reviews</Text>
+              <Text style={s.statLbl}>{store.reviews.toLocaleString()} {t("home.trust_verified_stores").toLowerCase().includes("متاجر") ? "تقييم" : "reviews"}</Text>
             </View>
             <View style={s.statDivider} />
             <View style={s.stat}>
               <Text style={s.statNum}>{store.eta}</Text>
-              <Text style={s.statLbl}>Delivery</Text>
+              <Text style={s.statLbl}>{t("checkout.delivery_label")}</Text>
             </View>
             <View style={s.statDivider} />
             <View style={s.stat}>
               <Text style={s.statNum}>AED {store.minOrder}</Text>
-              <Text style={s.statLbl}>Min order</Text>
+              <Text style={s.statLbl}>{t("toast.min_order", { amount: "" }).replace("AED ", "").replace(/\s+$/, "")}</Text>
             </View>
           </View>
 
           <View style={s.badgeRow}>
             <View style={s.badge}>
               <Ionicons name="shield-checkmark" size={12} color="#16A34A" />
-              <Text style={s.badgeText}>VERIFIED</Text>
+              <Text style={s.badgeText}>{t("home.trust_verified_stores")}</Text>
             </View>
             <View style={s.badge}>
               <Ionicons name="leaf" size={12} color="#16A34A" />
@@ -90,7 +106,7 @@ export default function StorePage() {
             </View>
             <View style={s.badge}>
               <Ionicons name="flash" size={12} color="#FF6B2C" />
-              <Text style={s.badgeText}>EXPRESS</Text>
+              <Text style={s.badgeText}>{t("checkout.express_2h").split(" ")[0].toUpperCase()}</Text>
             </View>
           </View>
         </View>
@@ -102,9 +118,9 @@ export default function StorePage() {
           contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
           style={{ marginTop: 18 }}
         >
-          {["All", "Top deals", "Snacks", "Dairy", "Fresh", "Bakery", "Beauty"].map((c, i) => (
-            <Pressable key={c} style={[s.chip, i === 0 && s.chipActive]}>
-              <Text style={[s.chipText, i === 0 && s.chipTextActive]}>{c}</Text>
+          {categoryChips.map((c, i) => (
+            <Pressable key={c.key} style={[s.chip, i === 0 && s.chipActive]}>
+              <Text style={[s.chipText, i === 0 && s.chipTextActive]}>{c.label}</Text>
             </Pressable>
           ))}
         </ScrollView>

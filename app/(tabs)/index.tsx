@@ -14,6 +14,7 @@ import type { Product, Category } from "../../lib/types";
 import { useAuth } from "../../lib/auth-context";
 import { useNotifications } from "../../lib/notifications-context";
 import { categories as STATIC_CATS } from "../../data/products";
+import { localizeCategory } from "../../lib/category-i18n";
 import ProductCard from "../../components/ProductCard";
 import HeaderIconButton from "../../components/HeaderIconButton";
 import NotificationPrePrompt from "../../components/NotificationPrePrompt";
@@ -157,13 +158,13 @@ export default function Home() {
         const match = STATIC_CATS.find((sc) => sc.label.toLowerCase() === c.name.toLowerCase());
         arr.push({
           key: c.name,
-          label: c.name,
+          label: localizeCategory(c.name, t),
           emoji: c.icon || match?.emoji || "🛒",
           tint: match?.tint || "#FFE7D1",
         });
       });
     } else {
-      STATIC_CATS.forEach((c) => arr.push({ key: c.label, label: c.label, emoji: c.emoji, tint: c.tint }));
+      STATIC_CATS.forEach((c) => arr.push({ key: c.label, label: localizeCategory(c.label, t), emoji: c.emoji, tint: c.tint }));
     }
     return arr;
   }, [liveCategories, t]);
