@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, useRef, useEffect, ReactNode } from "react";
 import { View, Text, Image, Animated, StyleSheet, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useTranslation } from "react-i18next";
 import type { Product, CartItem } from "./types";
 import { cartAPI, savedAPI } from "./api";
 import { transformProduct } from "./transformers";
@@ -34,6 +35,7 @@ type CartContextValue = {
 const CartContext = createContext<CartContextValue | null>(null);
 
 export function CartProvider({ children }: { children: ReactNode }) {
+  const { t } = useTranslation();
   const { customer, user } = useAuth();
   const [items, setItems] = useState<LocalCartItem[]>([]);
   const [saved, setSaved] = useState<string[]>([]);
@@ -74,14 +76,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
         customer?.fullName ||
         (user?.user_metadata?.full_name as string) ||
         user?.email?.split("@")[0] ||
-        "back";
-      showToast({ message: `Welcome back, ${name} 👋`, kind: "save" });
+        t("common.guest");
+      showToast({ message: t("toast.welcome_back_user", { name }), kind: "save" });
     } else if (prevId !== null && currentId === null) {
       // signed out
-      showToast({ message: "Signed out", kind: "info" });
+      showToast({ message: t("toast.signed_out_success"), kind: "info" });
     }
     prevUserRef.current = currentId;
-  }, [user?.id, customer?.fullName]);
+  }, [user?.id, customer?.fullName, t]);
 
   // Server cart is the source of truth (matches web). Load it when the user changes.
   const refreshCart = useCallback(async () => {
@@ -154,18 +156,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
         return [...prev, { product: p, qty: 1 }];
       });
       bump();
-      showToast({ product: p, message: "Added to cart", kind: "cart" });
+      showToast({ product: p, message: t("toast.item_added"), kind: "cart" });
 
       if (customer?.id) {
         const res = await cartAPI.addToCart(p.id, 1);
         if (res?.error) {
           console.warn("addToCart failed:", res.error);
-          showToast({ message: "Couldn't sync cart to server", kind: "info" });
+          showToast({ message: t("toast.cart_sync_failed"), kind: "info" });
         }
         await refreshCart(); // pick up cartItemId after server insert
       }
     },
-    [customer?.id, showToast, refreshCart]
+    [customer?.id, showToast, refreshCart, t]
   );
 
   const remove = useCallback(
@@ -204,14 +206,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const wasSaved = saved.includes(id);
       setSaved((prev) => (wasSaved ? prev.filter((x) => x !== id) : [...prev, id]));
       if (wasSaved) {
-        showToast({ message: "Removed from saved", kind: "info" });
+        showToast({ message: t("toast.removed_from_saved"), kind: "info" });
         if (customer?.id) await savedAPI.remove(id);
       } else {
-        showToast({ message: name ? `${name} saved` : "Saved", kind: "save" });
+        showToast({
+          message: name ? t("toast.item_saved_name", { name }) : t("toast.item_saved_generic"),
+          kind: "save",
+        });
         if (customer?.id) await savedAPI.add(id);
       }
     },
-    [saved, customer?.id, showToast]
+    [saved, customer?.id, showToast, t]
   );
 
   const isSaved = useCallback((id: string) => saved.includes(id), [saved]);

@@ -9,6 +9,7 @@ import {
   Alert,
   ActivityIndicator,
   Modal,
+  I18nManager,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -52,18 +53,19 @@ export default function Settings() {
     if (lang === currentLang) return;
     setSwitchingLang(true);
     try {
-      // Triggers Updates.reloadAsync() if direction changes — app
-      // restarts automatically, no user action needed.
+      // setLanguage internally flips RTL + tries to reload. If reload fails
+      // (preview/internal builds without expo-updates configured), it shows
+      // a fallback alert asking the user to close + reopen the app.
       await setLanguage(lang);
     } catch (e) {
       console.warn("Language change failed:", e);
-      Alert.alert("Error", "Could not switch language. Try again.");
+      Alert.alert(t("common.error"), t("toast.lang_change_failed"));
       setSwitchingLang(false);
     }
   };
 
   const handleSignOut = () => {
-    Alert.alert(t("auth.sign_out"), "Are you sure you want to sign out?", [
+    Alert.alert(t("auth.sign_out"), t("settings.sign_out_confirm"), [
       { text: t("common.cancel"), style: "cancel" },
       {
         text: t("auth.sign_out"),
@@ -79,7 +81,7 @@ export default function Settings() {
   const handleDeleteAccount = () => {
     Alert.alert(
       t("account.delete_account"),
-      "This will permanently delete your account, profile, cart, saved items, and notifications. Past orders will be kept in our records for legal and accounting purposes but will no longer be linked to your account.\n\nThis cannot be undone. Are you sure?",
+      t("settings.delete_account_confirm"),
       [
         { text: t("common.cancel"), style: "cancel" },
         {
@@ -87,12 +89,12 @@ export default function Settings() {
           style: "destructive",
           onPress: () => {
             Alert.alert(
-              "Final confirmation",
-              "Type-confirm not required, but this is your last chance. Delete account?",
+              t("settings.final_confirmation"),
+              t("settings.final_confirmation_msg"),
               [
                 { text: t("common.cancel"), style: "cancel" },
                 {
-                  text: "Yes, delete forever",
+                  text: t("settings.yes_delete_forever"),
                   style: "destructive",
                   onPress: async () => {
                     setDeleting(true);
@@ -100,14 +102,14 @@ export default function Settings() {
                     setDeleting(false);
                     if (error) {
                       Alert.alert(
-                        "Couldn't delete account",
-                        `${error}\n\nIf this keeps happening, email support@kafudeal.com and we'll process the deletion manually.`
+                        t("settings.couldnt_delete"),
+                        `${error}\n\nsupport@kafudeal.com`
                       );
                       return;
                     }
                     Alert.alert(
                       t("account.deleted"),
-                      "Your account and all associated data have been deleted. Sorry to see you go 👋",
+                      t("settings.delete_account_confirm").split("\n")[0],
                       [
                         {
                           text: t("common.ok"),
@@ -128,11 +130,13 @@ export default function Settings() {
     );
   };
 
+  const backIconStyle = I18nManager.isRTL ? { transform: [{ scaleX: -1 }] as any } : undefined;
+
   return (
     <View style={s.root}>
       <View style={[s.topBar, { paddingTop: insets.top + 8 }]}>
         <Pressable onPress={() => router.back()} style={s.iconBtn} hitSlop={12}>
-          <Ionicons name="chevron-back" size={24} color="#0F172A" />
+          <Ionicons name="chevron-back" size={24} color="#0F172A" style={backIconStyle} />
         </Pressable>
         <Text style={s.topTitle}>{t("account.settings")}</Text>
         <View style={{ width: 36 }} />
@@ -222,14 +226,11 @@ export default function Settings() {
                 </>
               )}
             </Pressable>
-            <Text style={s.deleteHelp}>
-              Permanently removes your account and personal data. Past orders are
-              anonymized for legal record-keeping. Cannot be undone.
-            </Text>
+            <Text style={s.deleteHelp}>{t("settings.delete_help")}</Text>
           </>
         )}
 
-        <Text style={s.footer}>Made with 💛 in the UAE</Text>
+        <Text style={s.footer}>{t("settings.made_with_love")}</Text>
       </ScrollView>
 
       {/* Language picker modal */}
@@ -260,9 +261,6 @@ export default function Settings() {
             >
               <Text style={s.langCancelText}>{t("common.cancel")}</Text>
             </Pressable>
-            <Text style={s.langNote}>
-              {t("common.loading") /* TODO i18n key for restart message */}
-            </Text>
           </Pressable>
         </Pressable>
       </Modal>
@@ -319,6 +317,9 @@ function Row({
   last?: boolean;
   onPress?: () => void;
 }) {
+  const chevronStyle = I18nManager.isRTL
+    ? { transform: [{ scaleX: -1 }] as any }
+    : undefined;
   return (
     <Pressable onPress={onPress} style={[s.row, !last && s.rowBorder]}>
       <Ionicons name={icon} size={20} color="#64748B" style={{ marginEnd: 14 }} />
@@ -333,10 +334,10 @@ function Row({
       ) : value2 ? (
         <>
           <Text style={s.rowValue}>{value2}</Text>
-          <Ionicons name="chevron-forward" size={16} color="#94A3B8" style={I18nManager.isRTL ? { transform: [{ scaleX: -1 }] } : undefined} />
+          <Ionicons name="chevron-forward" size={16} color="#94A3B8" style={chevronStyle} />
         </>
       ) : (
-        <Ionicons name="chevron-forward" size={16} color="#94A3B8" style={I18nManager.isRTL ? { transform: [{ scaleX: -1 }] } : undefined} />
+        <Ionicons name="chevron-forward" size={16} color="#94A3B8" style={chevronStyle} />
       )}
     </Pressable>
   );
@@ -403,9 +404,6 @@ const s = StyleSheet.create({
     marginTop: 8, paddingVertical: 12, alignItems: "center",
   },
   langCancelText: { color: "#64748B", fontSize: 13.5, fontWeight: "700" },
-  langNote: {
-    fontSize: 11, color: "#94A3B8", textAlign: "center", marginTop: 4,
-  },
   switchingOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(255,255,255,0.7)",

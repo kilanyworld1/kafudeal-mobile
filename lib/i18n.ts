@@ -19,7 +19,7 @@ import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import * as Localization from 'expo-localization';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { I18nManager } from 'react-native';
+import { Alert, I18nManager } from 'react-native';
 import * as Updates from 'expo-updates';
 
 import en from '../locales/en.json';
@@ -65,8 +65,9 @@ export function getCurrentLanguage(): SupportedLanguage {
  * Change the app language.
  * - If direction changes (LTR↔RTL), trigger a full app reload via
  *   Updates.reloadAsync() so the new layout takes effect everywhere.
- * - Supabase auth session is preserved across reload (stored in AsyncStorage,
- *   re-read by AuthProvider on init).
+ * - If reloadAsync() fails (preview builds without expo-updates configured),
+ *   show a friendly alert asking the user to close + reopen the app
+ *   instead of leaving them in a broken layout state.
  */
 export async function setLanguage(lang: SupportedLanguage): Promise<void> {
   await AsyncStorage.setItem(STORAGE_KEY, lang);
@@ -78,12 +79,34 @@ export async function setLanguage(lang: SupportedLanguage): Promise<void> {
   if (directionChanged) {
     I18nManager.allowRTL(true);
     I18nManager.forceRTL(shouldBeRTL);
+
     // Small delay so the AsyncStorage write completes before reload.
     await new Promise((r) => setTimeout(r, 300));
+
+    // Try reloadAsync. If it fails (which is common in EAS preview / internal
+    // builds where expo-updates isn't fully configured), fall back to a manual
+    // alert. The forceRTL has already been applied, so on next launch the app
+    // will render in the new direction.
+    let reloadOk = false;
     try {
       await Updates.reloadAsync();
+      reloadOk = true;
     } catch (err) {
-      console.warn('[i18n] reloadAsync failed (dev mode?):', err);
+      console.warn('[i18n] reloadAsync failed:', err);
+    }
+
+    if (!reloadOk) {
+      // i18n has the new language; rendered text will update naturally.
+      // Native RTL flip needs a fresh process to take effect, so we just
+      // ask the user to close + reopen. Localized message.
+      const isAr = lang === 'ar';
+      Alert.alert(
+        isAr ? 'إعادة التشغيل مطلوبة' : 'Restart required',
+        isAr
+          ? 'أغلق التطبيق وأعد فتحه لإكمال تبديل اللغة.'
+          : 'Please close and reopen the app to finish switching the language.',
+        [{ text: isAr ? 'موافق' : 'OK' }]
+      );
     }
   }
 }
