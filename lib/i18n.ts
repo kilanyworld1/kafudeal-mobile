@@ -7,9 +7,13 @@
  *     3. Apply RTL direction (Arabic = RTL, English = LTR) BEFORE first render
  *
  * - On user change (in Settings):
- *     1. Save preference to AsyncStorage
- *     2. If RTL direction changed → call expo-updates.reloadAsync() to apply
- *        the layout flip immediately.
+ *     1. Save preference to AsyncStorage (for next app launch)
+ *     2. Sync `preferred_language` to the customers table in Supabase, so
+ *        the server-side push-notification Edge Function can send updates
+ *        in the user's chosen language.
+ *     3. If RTL direction changed → call expo-updates.reloadAsync() to apply
+ *        the layout flip immediately. If that fails, show a friendly
+ *        "Restart required" alert in the user's language.
  *
  * Auth note: Supabase session is persisted in AsyncStorage, so the reload
  * preserves login state. AuthProvider re-reads the session on init.
@@ -21,6 +25,7 @@ import * as Localization from 'expo-localization';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert, I18nManager } from 'react-native';
 import * as Updates from 'expo-updates';
+import { supabase } from './supabase';
 
 import en from '../locales/en.json';
 import ar from '../locales/ar.json';
@@ -62,16 +67,56 @@ export function getCurrentLanguage(): SupportedLanguage {
 }
 
 /**
+ * Persist the user's language choice to the customers table so server-side
+ * code (push-notification Edge Function in particular) can send messages
+ * in the right language.
+ *
+ * - Tries the `set_my_preferred_language` RPC first (preferred path).
+ * - Falls back to a direct UPDATE on the customers row scoped by auth.uid().
+ * - Silently returns on any error — language sync is best-effort and must
+ *   never break the language-switch UX. Console-warn so we can debug.
+ */
+async function syncLanguageToDb(lang: SupportedLanguage): Promise<void> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user?.id) {
+      // Not signed in — nothing to sync. The next sign-in will re-evaluate.
+      return;
+    }
+
+    // Try the RPC first (single round-trip, server-side validation).
+    const rpcResult = await supabase.rpc('set_my_preferred_language', { lang });
+    if (!rpcResult.error) return;
+
+    // RPC missing or failed — fall back to a direct row update.
+    // RLS must allow customers to update their own row (auth_user_id = auth.uid()).
+    const { error: updateError } = await supabase
+      .from('customers')
+      .update({ preferred_language: lang })
+      .eq('auth_user_id', session.user.id);
+
+    if (updateError) {
+      console.warn('[i18n] DB language sync failed:', updateError.message);
+    }
+  } catch (e) {
+    console.warn('[i18n] DB language sync threw:', e);
+  }
+}
+
+/**
  * Change the app language.
- * - If direction changes (LTR↔RTL), trigger a full app reload via
- *   Updates.reloadAsync() so the new layout takes effect everywhere.
- * - If reloadAsync() fails (preview builds without expo-updates configured),
- *   show a friendly alert asking the user to close + reopen the app
- *   instead of leaving them in a broken layout state.
+ * - Save to AsyncStorage + i18next.
+ * - Sync to Supabase customers row (for push notifications).
+ * - If RTL direction changed, reload the app via expo-updates so the layout
+ *   flip takes effect everywhere. Falls back to a localized restart alert
+ *   if reloadAsync isn't available (preview builds, dev mode, etc.).
  */
 export async function setLanguage(lang: SupportedLanguage): Promise<void> {
   await AsyncStorage.setItem(STORAGE_KEY, lang);
   await i18n.changeLanguage(lang);
+
+  // Best-effort DB sync. Don't block the UI.
+  syncLanguageToDb(lang).catch(() => {});
 
   const shouldBeRTL = isRTL(lang);
   const directionChanged = I18nManager.isRTL !== shouldBeRTL;
@@ -79,14 +124,8 @@ export async function setLanguage(lang: SupportedLanguage): Promise<void> {
   if (directionChanged) {
     I18nManager.allowRTL(true);
     I18nManager.forceRTL(shouldBeRTL);
-
-    // Small delay so the AsyncStorage write completes before reload.
     await new Promise((r) => setTimeout(r, 300));
 
-    // Try reloadAsync. If it fails (which is common in EAS preview / internal
-    // builds where expo-updates isn't fully configured), fall back to a manual
-    // alert. The forceRTL has already been applied, so on next launch the app
-    // will render in the new direction.
     let reloadOk = false;
     try {
       await Updates.reloadAsync();
@@ -96,9 +135,6 @@ export async function setLanguage(lang: SupportedLanguage): Promise<void> {
     }
 
     if (!reloadOk) {
-      // i18n has the new language; rendered text will update naturally.
-      // Native RTL flip needs a fresh process to take effect, so we just
-      // ask the user to close + reopen. Localized message.
       const isAr = lang === 'ar';
       Alert.alert(
         isAr ? 'إعادة التشغيل مطلوبة' : 'Restart required',
@@ -135,6 +171,11 @@ export async function initI18n(): Promise<void> {
       interpolation: { escapeValue: false },
       returnNull: false,
     });
+
+  // After init, attempt one background sync. Useful when:
+  // - Device detected Arabic on first launch → DB still has 'en' default
+  // - User had switched language on an old build that didn't sync
+  syncLanguageToDb(language).catch(() => {});
 }
 
 export default i18n;
