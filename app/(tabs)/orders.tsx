@@ -3,6 +3,7 @@ import { View, Text, ScrollView, Pressable, Image, StyleSheet, ActivityIndicator
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useFocusEffect } from "expo-router";
+import { useTranslation } from "react-i18next";
 import { ordersAPI } from "../../lib/api";
 import { transformOrder } from "../../lib/transformers";
 import { supabase } from "../../lib/supabase";
@@ -10,19 +11,23 @@ import { useAuth } from "../../lib/auth-context";
 import type { Order } from "../../lib/types";
 
 const ACTIVE_STATUSES = ["pending", "confirmed", "preparing", "ready", "on_the_way", "out_for_delivery"];
-const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
-  pending:       { label: "PENDING",    color: "#94A3B8", bg: "rgba(148,163,184,0.15)" },
-  confirmed:     { label: "CONFIRMED",  color: "#1D4ED8", bg: "rgba(29,78,216,0.15)" },
-  preparing:     { label: "PREPARING",  color: "#B45309", bg: "rgba(245,158,11,0.15)" },
-  ready:         { label: "READY",      color: "#7C3AED", bg: "rgba(124,58,237,0.15)" },
-  on_the_way:    { label: "ON THE WAY", color: "#1D4ED8", bg: "rgba(29,78,216,0.15)" },
-  out_for_delivery: { label: "OUT FOR DELIVERY", color: "#1D4ED8", bg: "rgba(29,78,216,0.15)" },
-  delivered:     { label: "DELIVERED",  color: "#15803D", bg: "rgba(34,197,94,0.15)" },
-  cancelled:     { label: "CANCELLED",  color: "#DC2626", bg: "rgba(220,38,38,0.15)" },
+
+// Status metadata: colors stay the same, labels come from i18n via t(meta.key)
+// at render time. That way "PREPARING" → "قيد التحضير" when the app is Arabic.
+const STATUS_META: Record<string, { color: string; bg: string; key: string }> = {
+  pending:          { color: "#94A3B8", bg: "rgba(148,163,184,0.15)", key: "status.pending_caps" },
+  confirmed:        { color: "#1D4ED8", bg: "rgba(29,78,216,0.15)",  key: "status.confirmed_caps" },
+  preparing:        { color: "#B45309", bg: "rgba(245,158,11,0.15)", key: "status.preparing_caps" },
+  ready:            { color: "#7C3AED", bg: "rgba(124,58,237,0.15)", key: "status.ready_caps" },
+  on_the_way:       { color: "#1D4ED8", bg: "rgba(29,78,216,0.15)",  key: "status.on_the_way_caps" },
+  out_for_delivery: { color: "#1D4ED8", bg: "rgba(29,78,216,0.15)",  key: "status.out_for_delivery_caps" },
+  delivered:        { color: "#15803D", bg: "rgba(34,197,94,0.15)",  key: "status.delivered_caps" },
+  cancelled:        { color: "#DC2626", bg: "rgba(220,38,38,0.15)",  key: "status.cancelled_caps" },
 };
 
 export default function Orders() {
   const insets = useSafeAreaInsets();
+  const { t, i18n } = useTranslation();
   const { customer, user } = useAuth();
   const [tab, setTab] = useState<"active" | "past">("active");
   const [orders, setOrders] = useState<Order[]>([]);
@@ -39,11 +44,6 @@ export default function Orders() {
   }, [customer?.id]);
 
   // Single source of truth for the screen's lifecycle vs. auth state.
-  // - Signed out → reset everything, no loading
-  // - Signed in but customer profile still loading → show spinner
-  // - Signed in + customer loaded → fetch orders
-  // The `lastFetchRef` is reset to 0 here so a fresh focus on this tab after
-  // re-auth always triggers a refetch (no throttle leakage across sessions).
   useEffect(() => {
     if (!user) {
       setOrders([]);
@@ -52,7 +52,6 @@ export default function Orders() {
       return;
     }
     if (!customer?.id) {
-      // Auth context is still pulling the customer profile — show loading
       setLoading(true);
       return;
     }
@@ -68,7 +67,6 @@ export default function Orders() {
   }, [user?.id, customer?.id, fetchOrders]);
 
   // Refetch on focus, but skip if we fetched within the last 10 seconds
-  // (so flipping between tabs doesn't hammer the API)
   useFocusEffect(
     useCallback(() => {
       if (!customer?.id) return;
@@ -79,7 +77,6 @@ export default function Orders() {
   );
 
   // Realtime: refetch when ANY of this customer's orders change.
-  // Channel name includes user.id too so re-auth produces a fresh channel.
   useEffect(() => {
     if (!customer?.id) return;
     const channel = supabase
@@ -109,19 +106,24 @@ export default function Orders() {
   }, [orders]);
 
   const showSignedOut = !user;
+  const locale = i18n.language === "ar" ? "ar-AE" : "en-GB";
 
   return (
     <View style={s.root}>
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>
-        <Text style={s.title}>My Orders</Text>
-        <Text style={s.subtitle}>Track and reorder anytime</Text>
+        <Text style={s.title}>{t("orders.my_orders_title")}</Text>
+        <Text style={s.subtitle}>{t("orders.track_subtitle")}</Text>
 
         <View style={s.tabRow}>
           <Pressable onPress={() => setTab("active")} style={[s.tab, tab === "active" && s.tabActive]}>
-            <Text style={[s.tabText, tab === "active" && s.tabTextActive]}>Active ({active.length})</Text>
+            <Text style={[s.tabText, tab === "active" && s.tabTextActive]}>
+              {t("orders.tab_active_count", { count: active.length })}
+            </Text>
           </Pressable>
           <Pressable onPress={() => setTab("past")} style={[s.tab, tab === "past" && s.tabActive]}>
-            <Text style={[s.tabText, tab === "past" && s.tabTextActive]}>Past ({past.length})</Text>
+            <Text style={[s.tabText, tab === "past" && s.tabTextActive]}>
+              {t("orders.tab_past_count", { count: past.length })}
+            </Text>
           </Pressable>
         </View>
       </View>
@@ -129,16 +131,16 @@ export default function Orders() {
       {showSignedOut ? (
         <View style={s.empty}>
           <Ionicons name="lock-closed-outline" size={48} color="#CBD5E1" />
-          <Text style={s.emptyTitle}>Sign in to see your orders</Text>
-          <Text style={s.emptySub}>We'll keep your order history synced across devices</Text>
+          <Text style={s.emptyTitle}>{t("orders.signed_out_title")}</Text>
+          <Text style={s.emptySub}>{t("orders.signed_out_sub")}</Text>
           <Pressable onPress={() => router.push("/login")} style={s.emptyBtn}>
-            <Text style={s.emptyBtnText}>Sign in</Text>
+            <Text style={s.emptyBtnText}>{t("auth.sign_in")}</Text>
           </Pressable>
         </View>
       ) : loading ? (
         <View style={s.empty}>
           <ActivityIndicator color="#FF6B2C" size="large" />
-          <Text style={[s.emptySub, { marginTop: 16 }]}>Loading your orders…</Text>
+          <Text style={[s.emptySub, { marginTop: 16 }]}>{t("orders.loading")}</Text>
         </View>
       ) : (
         <ScrollView
@@ -149,14 +151,14 @@ export default function Orders() {
         >
           {tab === "active" ? (
             active.length === 0 ? (
-              <EmptyState icon="cube-outline" title="No active orders" sub="Your active orders will show here" />
+              <EmptyState icon="cube-outline" title={t("orders.no_active")} sub={t("orders.no_active_sub")} />
             ) : (
-              active.map((o) => <ActiveCard key={o.id} order={o} />)
+              active.map((o) => <ActiveCard key={o.id} order={o} t={t} locale={locale} />)
             )
           ) : past.length === 0 ? (
-            <EmptyState icon="time-outline" title="No past orders yet" sub="Once you order, history will appear here" />
+            <EmptyState icon="time-outline" title={t("orders.no_past")} sub={t("orders.no_past_sub")} />
           ) : (
-            past.map((o) => <PastRow key={o.id} order={o} />)
+            past.map((o) => <PastRow key={o.id} order={o} t={t} locale={locale} />)
           )}
         </ScrollView>
       )}
@@ -164,24 +166,24 @@ export default function Orders() {
   );
 }
 
-function ActiveCard({ order }: { order: Order }) {
-  const meta = STATUS_LABELS[order.status.toLowerCase()] || STATUS_LABELS.confirmed;
+function ActiveCard({ order, t, locale }: { order: Order; t: any; locale: string }) {
+  const meta = STATUS_META[order.status.toLowerCase()] || STATUS_META.confirmed;
   const items = order.items || [];
   const imgs = items.slice(0, 3).map((it) => it.product?.image).filter(Boolean);
   return (
     <Pressable onPress={() => router.push(`/order/${order.id}`)} style={s.card}>
       <View style={s.cardTop}>
         <View>
-          <Text style={s.cardLabel}>ORDER</Text>
+          <Text style={s.cardLabel}>{t("orders.order_label")}</Text>
           <Text style={s.cardId}>#{order.shortId}</Text>
-          <Text style={s.cardDate}>{formatDate(order.createdAt)}</Text>
+          <Text style={s.cardDate}>{formatDate(order.createdAt, locale)}</Text>
         </View>
         <View style={{ alignItems: "flex-end" }}>
-          <Text style={s.cardLabel}>Total</Text>
+          <Text style={s.cardLabel}>{t("orders.total_label")}</Text>
           <Text style={s.cardTotal}>AED {order.total.toFixed(2)}</Text>
           <View style={[s.statusPill, { backgroundColor: meta.bg }]}>
             <View style={[s.liveDot, { backgroundColor: meta.color }]} />
-            <Text style={[s.statusText, { color: meta.color }]}>{meta.label}</Text>
+            <Text style={[s.statusText, { color: meta.color }]}>{t(meta.key)}</Text>
           </View>
         </View>
       </View>
@@ -189,12 +191,14 @@ function ActiveCard({ order }: { order: Order }) {
         {imgs.map((img, i) => (
           <Image key={i} source={{ uri: img! }} style={s.imgChip} />
         ))}
-        <Text style={s.itemsText}>{order.itemsCount} {order.itemsCount === 1 ? "item" : "items"}</Text>
+        <Text style={s.itemsText}>
+          {order.itemsCount === 1 ? t("home.items_count_one") : t("home.items_count", { count: order.itemsCount })}
+        </Text>
       </View>
       <View style={s.cardActions}>
         <View style={s.trackChip}>
           <Ionicons name="navigate" size={12} color="#FF6B2C" />
-          <Text style={s.trackText}>Track order</Text>
+          <Text style={s.trackText}>{t("orders.track")}</Text>
         </View>
         <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
       </View>
@@ -202,23 +206,23 @@ function ActiveCard({ order }: { order: Order }) {
   );
 }
 
-function PastRow({ order }: { order: Order }) {
-  const meta = STATUS_LABELS[order.status.toLowerCase()] || STATUS_LABELS.delivered;
+function PastRow({ order, t, locale }: { order: Order; t: any; locale: string }) {
+  const meta = STATUS_META[order.status.toLowerCase()] || STATUS_META.delivered;
   const items = order.items || [];
   const imgs = items.slice(0, 3).map((it) => it.product?.image).filter(Boolean);
   return (
     <Pressable onPress={() => router.push(`/order/${order.id}`)} style={s.card}>
       <View style={s.cardTop}>
         <View>
-          <Text style={s.cardLabel}>ORDER</Text>
+          <Text style={s.cardLabel}>{t("orders.order_label")}</Text>
           <Text style={s.cardId}>#{order.shortId}</Text>
-          <Text style={s.cardDate}>{formatDate(order.createdAt)}</Text>
+          <Text style={s.cardDate}>{formatDate(order.createdAt, locale)}</Text>
         </View>
         <View style={{ alignItems: "flex-end" }}>
-          <Text style={s.cardLabel}>Total</Text>
+          <Text style={s.cardLabel}>{t("orders.total_label")}</Text>
           <Text style={s.cardTotal}>AED {order.total.toFixed(2)}</Text>
           <View style={[s.statusPill, { backgroundColor: meta.bg }]}>
-            <Text style={[s.statusText, { color: meta.color }]}>{meta.label}</Text>
+            <Text style={[s.statusText, { color: meta.color }]}>{t(meta.key)}</Text>
           </View>
         </View>
       </View>
@@ -228,14 +232,16 @@ function PastRow({ order }: { order: Order }) {
           {imgs.map((img, i) => (
             <Image key={i} source={{ uri: img! }} style={s.imgChip} />
           ))}
-          <Text style={s.itemsText}>{order.itemsCount} {order.itemsCount === 1 ? "item" : "items"}</Text>
+          <Text style={s.itemsText}>
+            {order.itemsCount === 1 ? t("home.items_count_one") : t("home.items_count", { count: order.itemsCount })}
+          </Text>
         </View>
       )}
 
       <View style={s.cardActions}>
         <Pressable style={s.reorderBtn} onPress={(e) => e.stopPropagation?.()}>
           <Ionicons name="refresh" size={12} color="#FF6B2C" />
-          <Text style={s.reorderText}>Reorder</Text>
+          <Text style={s.reorderText}>{t("orders.reorder")}</Text>
         </Pressable>
         <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
       </View>
@@ -253,11 +259,11 @@ function EmptyState({ icon, title, sub }: { icon: any; title: string; sub: strin
   );
 }
 
-function formatDate(iso?: string) {
+function formatDate(iso: string | undefined, locale: string) {
   if (!iso) return "";
   try {
     const d = new Date(iso);
-    return d.toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+    return d.toLocaleString(locale, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
   } catch {
     return "";
   }
@@ -309,17 +315,6 @@ const s = StyleSheet.create({
     backgroundColor: "#FFE7D1", borderRadius: 999,
   },
   trackText: { color: "#FF6B2C", fontSize: 12, fontWeight: "800" },
-  pastCard: {
-    flexDirection: "row", gap: 12,
-    backgroundColor: "white", borderRadius: 14, padding: 12, marginBottom: 10,
-    shadowColor: "#0F172A", shadowOpacity: 0.04,
-    shadowOffset: { width: 0, height: 2 }, shadowRadius: 6,
-  },
-  pastImgRow: { flexDirection: "column", gap: 2 },
-  pastImg: { width: 44, height: 22, borderRadius: 4, backgroundColor: "#F1EFE8" },
-  pastId: { fontFamily: "Menlo", fontSize: 13, fontWeight: "800", color: "#0F172A" },
-  pastDate: { fontSize: 11.5, color: "#64748B", marginTop: 3 },
-  pastTotal: { fontSize: 16, fontWeight: "800", color: "#FF6B2C" },
   reorderBtn: {
     flexDirection: "row", alignItems: "center", gap: 4,
     marginTop: 6,

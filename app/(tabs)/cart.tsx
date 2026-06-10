@@ -3,10 +3,12 @@ import { View, Text, ScrollView, Pressable, Image, StyleSheet, Animated } from "
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
+import { useTranslation } from "react-i18next";
 import { useCart } from "../../lib/cart-context";
 
 export default function Cart() {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const { items, subtotal, count, setQty, remove } = useCart();
   const delivery = items.length > 0 ? (subtotal >= 100 ? 0 : 15) : 0;
   const total = subtotal + delivery;
@@ -14,17 +16,19 @@ export default function Cart() {
   return (
     <View style={s.root}>
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>
-        <Text style={s.title}>Your cart</Text>
-        <Text style={s.subtitle}>{count} {count === 1 ? "item" : "items"}</Text>
+        <Text style={s.title}>{t("cart.your_cart")}</Text>
+        <Text style={s.subtitle}>
+          {count === 1 ? t("home.items_count_one") : t("home.items_count", { count })}
+        </Text>
       </View>
 
       {items.length === 0 ? (
         <View style={s.empty}>
           <Text style={{ fontSize: 64 }}>🛒</Text>
-          <Text style={s.emptyTitle}>Your cart is empty</Text>
-          <Text style={s.emptySub}>Add deals you love and check out when ready</Text>
+          <Text style={s.emptyTitle}>{t("cart.empty")}</Text>
+          <Text style={s.emptySub}>{t("cart.empty_sub")}</Text>
           <Pressable onPress={() => router.push("/(tabs)/deals")} style={s.emptyBtn}>
-            <Text style={s.emptyBtnText}>Browse deals</Text>
+            <Text style={s.emptyBtnText}>{t("cart.browse_deals")}</Text>
           </Pressable>
         </View>
       ) : (
@@ -43,23 +47,25 @@ export default function Cart() {
 
             <View style={s.summary}>
               <View style={s.summaryRow}>
-                <Text style={s.summaryLbl}>Subtotal</Text>
+                <Text style={s.summaryLbl}>{t("cart.subtotal")}</Text>
                 <Text style={s.summaryVal}>AED {subtotal.toFixed(2)}</Text>
               </View>
               <View style={[s.summaryRow, { marginTop: 8 }]}>
-                <Text style={s.summaryLbl}>Delivery {subtotal >= 100 ? "(free)" : ""}</Text>
+                <Text style={s.summaryLbl}>
+                  {t("cart.delivery_fee")}{subtotal >= 100 ? ` (${t("cart.free")})` : ""}
+                </Text>
                 <Text style={[s.summaryVal, delivery === 0 && { color: "#16A34A" }]}>
-                  {delivery === 0 ? "FREE" : `AED ${delivery.toFixed(2)}`}
+                  {delivery === 0 ? t("cart.free_caps") : `AED ${delivery.toFixed(2)}`}
                 </Text>
               </View>
               {subtotal < 100 && (
                 <Text style={s.freeShipHint}>
-                  Add AED {(100 - subtotal).toFixed(2)} more for FREE delivery
+                  {t("cart.free_shipping_hint", { amount: (100 - subtotal).toFixed(2) })}
                 </Text>
               )}
               <View style={s.divider} />
               <View style={s.summaryRow}>
-                <Text style={s.totalLbl}>Total</Text>
+                <Text style={s.totalLbl}>{t("cart.total")}</Text>
                 <Text style={s.totalVal}>AED {total.toFixed(2)}</Text>
               </View>
             </View>
@@ -67,7 +73,7 @@ export default function Cart() {
 
           <View style={s.checkoutWrap}>
             <Pressable onPress={() => router.push("/checkout")} style={s.checkoutBtn}>
-              <Text style={s.checkoutText}>Checkout · AED {total.toFixed(2)}</Text>
+              <Text style={s.checkoutText}>{t("cart.checkout")} · AED {total.toFixed(2)}</Text>
             </Pressable>
           </View>
         </>
@@ -189,7 +195,7 @@ const s = StyleSheet.create({
   },
   qtyText: { fontSize: 15, fontWeight: "800", color: "#0F172A", minWidth: 20, textAlign: "center" },
   removeBtn: {
-    position: "absolute", top: 8, right: 8,
+    position: "absolute", top: 8, end: 8,
     width: 24, height: 24, borderRadius: 12,
     alignItems: "center", justifyContent: "center",
   },

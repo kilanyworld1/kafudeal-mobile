@@ -1,8 +1,9 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
-import { View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator, RefreshControl } from "react-native";
+import { View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator, RefreshControl, I18nManager } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useFocusEffect } from "expo-router";
+import { useTranslation } from "react-i18next";
 import { productsAPI } from "../lib/api";
 import { transformProduct } from "../lib/transformers";
 import type { Product } from "../lib/types";
@@ -11,6 +12,7 @@ import ProductCard from "../components/ProductCard";
 
 export default function Saved() {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const { saved } = useCart();
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,28 +44,35 @@ export default function Saved() {
     [allProducts, saved]
   );
 
+  const urgentCount = items.filter((p) => p.urgent).length;
+
+  // Back chevron mirrors visually in RTL so it points the reading direction
+  const backIconStyle = I18nManager.isRTL
+    ? { transform: [{ scaleX: -1 }] as any }
+    : undefined;
+
   return (
     <View style={s.root}>
       <View style={[s.topBar, { paddingTop: insets.top + 8 }]}>
         <Pressable onPress={() => router.back()} style={s.iconBtn}>
-          <Ionicons name="chevron-back" size={24} color="#0F172A" />
+          <Ionicons name="chevron-back" size={24} color="#0F172A" style={backIconStyle} />
         </Pressable>
-        <Text style={s.topTitle}>Saved deals</Text>
+        <Text style={s.topTitle}>{t("saved.title")}</Text>
         <View style={{ width: 36 }} />
       </View>
 
       {loading ? (
         <View style={s.empty}>
           <ActivityIndicator color="#FF6B2C" size="large" />
-          <Text style={s.emptySub}>Loading…</Text>
+          <Text style={s.emptySub}>{t("common.loading")}</Text>
         </View>
       ) : items.length === 0 ? (
         <View style={s.empty}>
           <Text style={{ fontSize: 56 }}>💝</Text>
-          <Text style={s.emptyTitle}>No saved deals yet</Text>
-          <Text style={s.emptySub}>Tap the heart on any product to save it for later</Text>
+          <Text style={s.emptyTitle}>{t("saved.empty")}</Text>
+          <Text style={s.emptySub}>{t("saved.empty_sub")}</Text>
           <Pressable onPress={() => router.push("/(tabs)/deals")} style={s.emptyBtn}>
-            <Text style={s.emptyBtnText}>Browse deals</Text>
+            <Text style={s.emptyBtnText}>{t("cart.browse_deals")}</Text>
           </Pressable>
         </View>
       ) : (
@@ -74,9 +83,10 @@ export default function Saved() {
           }
         >
           <Text style={s.subtitle}>
-            {items.length} item{items.length === 1 ? "" : "s"} saved
-            {items.filter((p) => p.urgent).length > 0 &&
-              ` · ${items.filter((p) => p.urgent).length} ending soon`}
+            {items.length === 1
+              ? t("saved.item_count_one")
+              : t("saved.items_count", { count: items.length })}
+            {urgentCount > 0 ? ` · ${t("saved.ending_soon_count", { count: urgentCount })}` : ""}
           </Text>
 
           <View style={s.grid}>
