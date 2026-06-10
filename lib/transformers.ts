@@ -1,18 +1,12 @@
 import { Product, Category, Partner, Order, Customer } from "./types";
 
-function fmtEndsIn(expiryDate?: string | null) {
-  if (!expiryDate) return "";
-  const now = new Date();
-  const exp = new Date(expiryDate);
-  const ms = exp.getTime() - now.getTime();
-  if (ms <= 0) return "Expired";
-  const hours = Math.floor(ms / (1000 * 60 * 60));
-  if (hours < 24) return `${hours}h left`;
-  const days = Math.floor(hours / 24);
-  if (days === 1) return "Tomorrow";
-  if (days < 7) return `${days}d left`;
-  return `${Math.floor(days / 7)}w left`;
-}
+/**
+ * IMPORTANT: We deliberately do NOT format "ends in" / "expired" strings here.
+ * Those are language-dependent and need access to the i18n `t` function, which
+ * doesn't belong in a pure data transformer. Use `formatTimeRemaining` from
+ * `lib/format-time` in your component, passing it the product's expiry_date
+ * along with `t` from useTranslation().
+ */
 
 /** Bridge from raw Supabase row (snake_case) to mobile UI shape (camelCase + aliases). */
 export function transformProduct(p: any): Product {
@@ -55,7 +49,9 @@ export function transformProduct(p: any): Product {
     price: discounted,
     was: original,
     discount: discountPct,
-    endsIn: fmtEndsIn(p.expiry_date),
+    // endsIn is intentionally left empty — components format it via
+    // formatTimeRemaining(expiryDate, t) so the string is localized.
+    endsIn: "",
     urgent: expiryDays <= 1,
     // Match web: show "Expiring soon" banner for products with <= 14 days
     expiringSoon: expDate !== null && expiryDays <= 14 && expiryDays > 0,

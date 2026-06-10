@@ -193,7 +193,7 @@ export default function Settings() {
           <Row
             icon="information-circle-outline"
             label={t("settings.about_kafudeal")}
-            value2="v0.13.0"
+            value2="v0.14.0"
             onPress={() =>
               Alert.alert(
                 t("settings.about_kafudeal"),

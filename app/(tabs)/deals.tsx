@@ -3,14 +3,20 @@ import { View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator, Refre
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useFocusEffect } from "expo-router";
+import { useTranslation } from "react-i18next";
 import { productsAPI, categoriesAPI } from "../../lib/api";
 import { transformProduct, transformCategory } from "../../lib/transformers";
 import type { Product, Category } from "../../lib/types";
+import { localizeCategory } from "../../lib/category-i18n";
 import ProductCard from "../../components/ProductCard";
+
+const ALL = "__ALL__";
+const ENDING = "__ENDING__";
 
 export default function Deals() {
   const insets = useSafeAreaInsets();
-  const [filter, setFilter] = useState("All");
+  const { t } = useTranslation();
+  const [filter, setFilter] = useState(ALL);
   const [products, setProducts] = useState<Product[]>([]);
   const [cats, setCats] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,15 +54,22 @@ export default function Deals() {
     setRefreshing(false);
   }, [fetchAll]);
 
+  // Filters: store internal keys (ALL, ENDING, or original DB category name)
+  // but display localized labels. Picking the same key on a chip filters
+  // products against the underlying English category value.
   const filters = useMemo(() => {
     const dynamicCats = cats.slice(0, 6).map((c) => c.name);
-    return ["All", "Ending soon", ...dynamicCats];
-  }, [cats]);
+    return [
+      { key: ALL, label: t("home.category_all") },
+      { key: ENDING, label: t("home.ending_soon") },
+      ...dynamicCats.map((name) => ({ key: name, label: localizeCategory(name, t) })),
+    ];
+  }, [cats, t]);
 
   const filtered = useMemo(() => {
     return products.filter((p) => {
-      if (filter === "All") return true;
-      if (filter === "Ending soon") return p.urgent;
+      if (filter === ALL) return true;
+      if (filter === ENDING) return p.urgent;
       return p.category === filter;
     });
   }, [products, filter]);
@@ -64,14 +77,14 @@ export default function Deals() {
   return (
     <View style={s.root}>
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>
-        <Text style={s.title}>Deals</Text>
+        <Text style={s.title}>{t("tab.deals")}</Text>
         <Text style={s.subtitle}>
-          {products.length} deals near you · ending soon
+          {t("deals.subtitle", { count: products.length })}
         </Text>
 
         <Pressable onPress={() => router.push("/search")} style={s.searchBar}>
           <Ionicons name="search" size={18} color="#64748B" />
-          <Text style={s.searchText}>Search snacks, brands, stores…</Text>
+          <Text style={s.searchText}>{t("deals.search_placeholder")}</Text>
         </Pressable>
 
         <ScrollView
@@ -82,11 +95,11 @@ export default function Deals() {
         >
           {filters.map((f) => (
             <Pressable
-              key={f}
-              onPress={() => setFilter(f)}
-              style={[s.chip, filter === f && s.chipActive]}
+              key={f.key}
+              onPress={() => setFilter(f.key)}
+              style={[s.chip, filter === f.key && s.chipActive]}
             >
-              <Text style={[s.chipText, filter === f && s.chipTextActive]}>{f}</Text>
+              <Text style={[s.chipText, filter === f.key && s.chipTextActive]}>{f.label}</Text>
             </Pressable>
           ))}
         </ScrollView>
@@ -95,7 +108,7 @@ export default function Deals() {
       {loading ? (
         <View style={s.loading}>
           <ActivityIndicator color="#FF6B2C" size="large" />
-          <Text style={s.loadingText}>Loading deals…</Text>
+          <Text style={s.loadingText}>{t("deals.loading")}</Text>
         </View>
       ) : (
         <ScrollView
@@ -104,7 +117,7 @@ export default function Deals() {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FF6B2C" />
           }
         >
-          <Text style={s.resultsCount}>{filtered.length} results</Text>
+          <Text style={s.resultsCount}>{t("deals.results", { count: filtered.length })}</Text>
           <View style={s.grid}>
             {filtered.map((p) => (
               <View key={p.id} style={{ width: "47.5%" }}>
@@ -113,7 +126,7 @@ export default function Deals() {
             ))}
           </View>
           {filtered.length === 0 && (
-            <Text style={s.empty}>No deals match this filter</Text>
+            <Text style={s.empty}>{t("deals.no_match")}</Text>
           )}
         </ScrollView>
       )}

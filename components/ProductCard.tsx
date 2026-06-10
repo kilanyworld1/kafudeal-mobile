@@ -5,6 +5,7 @@ import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import type { Product } from "../lib/types";
 import { useCart } from "../lib/cart-context";
+import { formatTimeRemaining } from "../lib/format-time";
 
 type Props = {
   product: Product;
@@ -36,11 +37,18 @@ export default function ProductCard({ product: p, width, variant = "default" }: 
     ]).start();
   };
 
-  const urgent = (p.endsIn || "").toLowerCase().includes("h left");
   // Localized fallback when the product has no partner name set.
   const storeLabel = p.store && p.store.trim().length > 0
     ? p.store
     : t("product.verified_store");
+
+  // Format the "ends in" / "expired" string in the user's language. The
+  // transformer no longer hardcodes English here.
+  const endsInLabel = formatTimeRemaining(p.expiryDate, t);
+
+  // `urgent` already lives on the product (expiryDays <= 1), so we don't need
+  // to parse the localized string to decide if the chip turns red.
+  const urgent = p.urgent;
 
   return (
     <Pressable
@@ -77,7 +85,7 @@ export default function ProductCard({ product: p, width, variant = "default" }: 
           <View style={s.endsRow}>
             <Ionicons name="time-outline" size={11} color={urgent ? "#DC2626" : "#64748B"} />
             <Text style={[s.endsText, urgent && { color: "#DC2626", fontWeight: "800" }]}>
-              {p.endsIn}
+              {endsInLabel}
             </Text>
           </View>
         </View>

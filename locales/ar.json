@@ -117,7 +117,19 @@
     "expires_label": "تنتهي",
     "in_x_days": "خلال {{days}} أيام",
     "today_label": "اليوم",
-    "tomorrow_label": "غداً"
+    "tomorrow_label": "غداً",
+    "expired": "منتهي الصلاحية",
+    "hours_left": "متبقي {{hours}} ساعة",
+    "tomorrow": "غداً",
+    "days_left": "متبقي {{days}} أيام",
+    "weeks_left": "متبقي {{weeks}} أسابيع"
+  },
+  "deals": {
+    "subtitle": "{{count}} عرض قريب · تنتهي قريباً",
+    "search_placeholder": "ابحث عن وجبات خفيفة، علامات، متاجر…",
+    "loading": "جاري تحميل العروض…",
+    "results": "{{count}} نتيجة",
+    "no_match": "لا توجد عروض مطابقة لهذا الفلتر"
   },
   "cart": {
     "title": "السلة",

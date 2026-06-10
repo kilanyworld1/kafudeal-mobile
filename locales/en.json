@@ -117,7 +117,19 @@
     "expires_label": "Expires",
     "in_x_days": "in {{days}} days",
     "today_label": "today",
-    "tomorrow_label": "tomorrow"
+    "tomorrow_label": "tomorrow",
+    "expired": "Expired",
+    "hours_left": "{{hours}}h left",
+    "tomorrow": "Tomorrow",
+    "days_left": "{{days}}d left",
+    "weeks_left": "{{weeks}}w left"
+  },
+  "deals": {
+    "subtitle": "{{count}} deals near you · ending soon",
+    "search_placeholder": "Search snacks, brands, stores…",
+    "loading": "Loading deals…",
+    "results": "{{count}} results",
+    "no_match": "No deals match this filter"
   },
   "cart": {
     "title": "Cart",
