@@ -2,7 +2,7 @@
   "expo": {
     "name": "KafuDeal",
     "slug": "kafudeal",
-    "version": "0.13.0",
+    "version": "0.15.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "kafudeal",
