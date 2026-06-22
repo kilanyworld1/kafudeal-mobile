@@ -2,7 +2,7 @@
   "expo": {
     "name": "KafuDeal",
     "slug": "kafudeal",
-    "version": "0.15.2",
+    "version": "0.18.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "kafudeal",
@@ -19,7 +19,8 @@
       "usesAppleSignIn": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
-      }
+      },
+      "buildNumber": "20"
     },
     "android": {
       "adaptiveIcon": {
@@ -60,8 +61,7 @@
           }
         }
       ],
-      "expo-localization",
-      "./plugins/with-fmt-fix.js"
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": false

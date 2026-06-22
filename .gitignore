@@ -15,7 +15,6 @@ web-build/
 # `npx expo run:ios`. We never want these in the repo because they're
 # huge and platform-specific.
 android/
-ios/
 
 # Sensitive
 .env*
@@ -23,3 +22,7 @@ ios/
 # macOS
 .DS_Store
 supabase/.temp/
+
+ios/build/
+ios/Pods/
+ios/Podfile.lock
