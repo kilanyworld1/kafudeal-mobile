@@ -1,7 +1,7 @@
 {
   "name": "kafudeal-mobile",
   "main": "expo-router/entry",
-  "version": "0.18.0",
+  "version": "1.0.1",
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",

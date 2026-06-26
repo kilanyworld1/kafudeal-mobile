@@ -2,7 +2,7 @@
   "expo": {
     "name": "KafuDeal",
     "slug": "kafudeal",
-    "version": "0.18.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "kafudeal",
@@ -20,7 +20,7 @@
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       },
-      "buildNumber": "20"
+      "buildNumber": "23"
     },
     "android": {
       "adaptiveIcon": {
